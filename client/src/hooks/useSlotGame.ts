@@ -249,6 +249,13 @@ export function useSlotGame() {
 
       const playNextStep = () => {
         if (stepIndex >= steps.length) {
+          // In free spins, apply final multiplier at end of tumble sequence
+          if (isFreeSpins && steps.length > 0) {
+            const finalMultiplierTotal = steps[steps.length - 1].multiplierTotal;
+            if (finalMultiplierTotal > 0) {
+              cumulativeWin *= finalMultiplierTotal;
+            }
+          }
           const totalWin = cumulativeWin * betAmount;
           // In free spins, don't count bet or spins (already counted in the triggering spin)
           const statsBet = isFreeSpins ? 0 : betAmount;
@@ -262,17 +269,31 @@ export function useSlotGame() {
             betAmount
           );
 
-          // In animation mode, balance was already added step-by-step.
-          // Only add balance here in turbo (no-anim) mode.
+          // In animation mode, balance was already added step-by-step (base payout only).
+          // In turbo mode, add full totalWin at once.
+          // For FS with multiplier: animation mode already added base payouts step-by-step,
+          // so we need to add the multiplier bonus (totalWin - basePayout*betAmount).
+          const basePayout = steps.reduce((sum, s) => sum + s.payout, 0);
+          const baseWinAmount = basePayout * betAmount;
+          const multiplierBonus = totalWin - baseWinAmount; // extra from multiplier
           const shouldAddBalance = !anim;
+          const animMultiplierBonus = anim && isFreeSpins && multiplierBonus > 0 ? multiplierBonus : 0;
 
           if (isFreeSpins) {
-            const newTotalWin = currentFreeSpinsTotalWin + totalWin;
+            const MAX_WIN_CAP = 25000; // 25,000x bet max win
+            let newTotalWin = currentFreeSpinsTotalWin + totalWin;
             let newRemaining = currentFreeSpinsRemaining - 1;
 
             const retriggered = spinResult.scatterCount >= RETRIGGER_SCATTER;
             if (retriggered) {
               newRemaining += FREE_SPINS_RETRIGGER;
+            }
+
+            // Max win cap: if total FS win reaches 25,000x bet, end immediately
+            const totalWinMultiplier = newTotalWin / betAmount;
+            if (totalWinMultiplier >= MAX_WIN_CAP) {
+              newTotalWin = MAX_WIN_CAP * betAmount;
+              newRemaining = 0; // force end
             }
 
             if (newRemaining <= 0) {
@@ -281,7 +302,7 @@ export function useSlotGame() {
                 phase: "free_spins_end",
                 winPositions: [],
                 currentWinSymbol: null,
-                balance: shouldAddBalance ? prev.balance + totalWin : prev.balance,
+                balance: shouldAddBalance ? prev.balance + totalWin : prev.balance + animMultiplierBonus,
                 freeSpinsRemaining: 0,
                 freeSpinsTotalWin: newTotalWin,
                 spinWin: totalWin,
@@ -298,7 +319,7 @@ export function useSlotGame() {
                 phase: "free_spins_spinning",
                 winPositions: [],
                 currentWinSymbol: null,
-                balance: shouldAddBalance ? prev.balance + totalWin : prev.balance,
+                balance: shouldAddBalance ? prev.balance + totalWin : prev.balance + animMultiplierBonus,
                 freeSpinsRemaining: newRemaining,
                 freeSpinsTotalWin: newTotalWin,
                 spinWin: totalWin,
@@ -369,10 +390,8 @@ export function useSlotGame() {
           winPositions.push(...win.positions);
         }
 
+        // In FS, don't multiply per-step; multiplier is applied at end of sequence
         let stepWin = step.payout;
-        if (isFreeSpins && step.multiplierTotal > 0) {
-          stepWin *= step.multiplierTotal;
-        }
         cumulativeWin += stepWin;
         const stepWinAmount = stepWin * betAmount;
 
@@ -394,8 +413,8 @@ export function useSlotGame() {
           currentTumbleStep: step,
           currentMultiplierTotal: step.multiplierTotal,
           message: isFreeSpins && step.multiplierTotal > 0
-            ? `Tumble #${stepIndex + 1}: ${step.payout.toFixed(2)}x × ${step.multiplierTotal}x = ${stepWin.toFixed(2)}x`
-            : `Tumble #${stepIndex + 1}: +${step.payout.toFixed(2)}x`,
+            ? `Tumble #${stepIndex}: +${step.payout.toFixed(2)}x (Multipliers on screen: ${step.multiplierTotal}x)`
+            : `Tumble #${stepIndex}: +${step.payout.toFixed(2)}x`,
         }));
 
         stepIndex++;

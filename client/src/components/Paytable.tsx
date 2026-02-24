@@ -119,7 +119,7 @@ export const Paytable: React.FC = () => {
 
             <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700">
               <span className="font-bold">🍭 Scatter (Lollipop):</span>{" "}
-              4=3x | 5=5x | 6=100x<br />
+              4=2.4x | 5=4x | 6=80x<br />
               4 or more scatters trigger <span className="text-amber-600 font-bold">10 Free Spins</span>
             </div>
           </div>
@@ -149,8 +149,8 @@ export const Paytable: React.FC = () => {
               <h4 className="text-amber-600 font-bold text-sm">Free Spins</h4>
               <p>• Trigger: 4/5/6 scatter symbols</p>
               <p>• Base: 10 free spins</p>
-              <p>• Scatter payout: 4=3x, 5=5x, 6=100x</p>
-              <p>• Retrigger: ≥4 scatters = +5 spins</p>
+              <p>• Scatter payout: 4=2.4x, 5=4x, 6=80x</p>
+              <p>• Retrigger: ≥3 scatters during FS = +5 spins</p>
               <p>• Multiplier bombs: 2x–1000x</p>
               <p>• Multipliers accumulate and apply to total win</p>
             </div>
@@ -207,9 +207,9 @@ export const Paytable: React.FC = () => {
             <div className="bg-slate-50 rounded p-2 space-y-1 border border-slate-200">
               <h4 className="text-purple-600 font-bold text-sm">Multiplier Bomb Probability</h4>
               <p>During free spins, ~8% chance per cell on refill</p>
-              <p>Multiplier values (22 tiers):</p>
+              <p>Multiplier values (14 tiers):</p>
               <div className="flex flex-wrap gap-1 mt-1">
-                {[2,3,4,5,6,8,10,15,20,25,50,100,200,500,1000].map(v => (
+                {[2,3,4,5,6,8,10,12,15,20,25,50,100,1000].map(v => (
                   <span key={v} className={cn(
                     "px-1.5 py-0.5 rounded text-xs font-mono border",
                     v >= 500 ? "bg-amber-100 text-amber-700 border-amber-300" :

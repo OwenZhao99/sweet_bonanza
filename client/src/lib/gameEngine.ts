@@ -56,7 +56,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#ef4444",
     bgColor: "#7f1d1d",
     weight: 3,
-    pays: { 8: 10, 9: 10, 10: 25, 11: 25, 12: 50 },
+    pays: { 8: 8, 9: 8, 10: 20, 11: 20, 12: 40 },
   },
   {
     id: "purple",
@@ -65,7 +65,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#a855f7",
     bgColor: "#4a1d96",
     weight: 4,
-    pays: { 8: 2.5, 9: 2.5, 10: 10, 11: 10, 12: 25 },
+    pays: { 8: 2, 9: 2, 10: 8, 11: 8, 12: 20 },
   },
   {
     id: "green",
@@ -74,7 +74,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#22c55e",
     bgColor: "#14532d",
     weight: 4,
-    pays: { 8: 2, 9: 2, 10: 5, 11: 5, 12: 15 },
+    pays: { 8: 1.6, 9: 1.6, 10: 4, 11: 4, 12: 12 },
   },
   {
     id: "blue",
@@ -83,7 +83,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#3b82f6",
     bgColor: "#1e3a8a",
     weight: 5,
-    pays: { 8: 1.5, 9: 1.5, 10: 2, 11: 2, 12: 12 },
+    pays: { 8: 1.2, 9: 1.2, 10: 1.6, 11: 1.6, 12: 9.6 },
   },
   {
     id: "apple",
@@ -92,7 +92,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#dc2626",
     bgColor: "#7f1d1d",
     weight: 5,
-    pays: { 8: 1, 9: 1, 10: 1.5, 11: 1.5, 12: 10 },
+    pays: { 8: 0.8, 9: 0.8, 10: 1.2, 11: 1.2, 12: 8 },
   },
   {
     id: "plum",
@@ -101,7 +101,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#7c3aed",
     bgColor: "#3b0764",
     weight: 6,
-    pays: { 8: 0.8, 9: 0.8, 10: 1.2, 11: 1.2, 12: 8 },
+    pays: { 8: 0.64, 9: 0.64, 10: 0.96, 11: 0.96, 12: 6.4 },
   },
   {
     id: "watermelon",
@@ -110,7 +110,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#16a34a",
     bgColor: "#14532d",
     weight: 6,
-    pays: { 8: 0.5, 9: 0.5, 10: 1, 11: 1, 12: 5 },
+    pays: { 8: 0.4, 9: 0.4, 10: 0.8, 11: 0.8, 12: 4 },
   },
   {
     id: "grape",
@@ -119,7 +119,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#9333ea",
     bgColor: "#3b0764",
     weight: 7,
-    pays: { 8: 0.4, 9: 0.4, 10: 0.9, 11: 0.9, 12: 4 },
+    pays: { 8: 0.32, 9: 0.32, 10: 0.72, 11: 0.72, 12: 3.2 },
   },
   {
     id: "banana",
@@ -128,7 +128,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#eab308",
     bgColor: "#713f12",
     weight: 8,
-    pays: { 8: 0.25, 9: 0.25, 10: 0.75, 11: 0.75, 12: 2 },
+    pays: { 8: 0.2, 9: 0.2, 10: 0.6, 11: 0.6, 12: 1.6 },
   },
   {
     id: "scatter",
@@ -137,7 +137,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#f97316",
     bgColor: "#7c2d12",
     weight: 1,  // weight 1 → ~2.04% per cell, P(≥4 in 30) ≈ 0.31% (~1 in 321 spins)
-    pays: { 4: 3, 5: 5, 6: 100 },
+    pays: { 4: 2.4, 5: 4, 6: 80 },
   },
 ];
 
@@ -159,11 +159,10 @@ export const MIN_WIN_COUNT = 8;
 export const SCATTER_TRIGGER = 4;
 export const FREE_SPINS_BASE = 10;
 export const FREE_SPINS_RETRIGGER = 5;
-export const RETRIGGER_SCATTER = 4;
+export const RETRIGGER_SCATTER = 3;
 
 export const MULTIPLIER_VALUES = [
-  2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50,
-  75, 100, 150, 200, 300, 500, 750, 1000
+  2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 50, 100, 1000
 ];
 
 export const SUPER_FREE_SPINS_MIN_MULTIPLIER = 20;
@@ -618,13 +617,18 @@ export function spin(
     superFreeSpins
   );
 
-  let totalPayout = 0;
+  // Sum all step payouts first (without multiplier)
+  let basePayout = 0;
   for (const step of tumbleSteps) {
-    let stepPayout = step.payout;
-    if (isFreeSpins && step.multiplierTotal > 0) {
-      stepPayout *= step.multiplierTotal;
+    basePayout += step.payout;
+  }
+  // In free spins, apply final multiplierTotal at the end of the sequence
+  let totalPayout = basePayout;
+  if (isFreeSpins && tumbleSteps.length > 0) {
+    const finalMultiplierTotal = tumbleSteps[tumbleSteps.length - 1].multiplierTotal;
+    if (finalMultiplierTotal > 0) {
+      totalPayout = basePayout * finalMultiplierTotal;
     }
-    totalPayout += stepPayout;
   }
 
   totalPayout += initialSpinResult.scatterPayout;
