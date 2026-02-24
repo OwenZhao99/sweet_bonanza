@@ -575,7 +575,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="shrink-0 h-[120px]">
+          <div className="shrink-0 h-[200px]">
             <SpinInfo
               phase={phase}
               message={message}
