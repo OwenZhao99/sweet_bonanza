@@ -561,8 +561,8 @@ export default function Home() {
 
         {/* ---- Center Game Area ---- */}
         <div className="flex-1 flex flex-col overflow-hidden p-2 gap-1.5 bg-slate-100">
-          <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
-            <div className="max-w-md w-full h-full" style={{ aspectRatio: '6/5', maxHeight: '100%' }}>
+          <div className="flex-1 min-h-0 flex items-center justify-center">
+            <div className="max-w-md w-full" style={{ aspectRatio: '6/5', maxHeight: '100%' }}>
               <GameGrid
                 grid={grid}
                 multipliers={multipliers}
@@ -575,7 +575,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="shrink-0 overflow-y-auto" style={{ maxHeight: '35%' }}>
+          <div className="shrink-0 h-[120px]">
             <SpinInfo
               phase={phase}
               message={message}
