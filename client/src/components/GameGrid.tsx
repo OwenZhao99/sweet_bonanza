@@ -83,7 +83,7 @@ const Cell: React.FC<CellProps> = ({
       className={cn(
         "rounded border flex flex-col items-center justify-center relative select-none min-h-0",
         isWin
-          ? "border-yellow-500 shadow-[0_0_12px_rgba(234,179,8,0.5)] scale-105 z-10 animate-win-pop"
+          ? "border-yellow-500 shadow-[0_0_12px_rgba(234,179,8,0.5)] z-10 animate-win-pop"
           : isScatter
           ? "border-orange-400 shadow-[0_0_8px_rgba(249,115,22,0.4)]"
           : "border-slate-200",
@@ -158,7 +158,7 @@ export const GameGrid: React.FC<GameGridProps> = ({
           ? "border-yellow-400 bg-gradient-to-b from-yellow-50 to-amber-50 shadow-[0_0_20px_rgba(234,179,8,0.25)]"
           : "border-slate-200 bg-white shadow-sm"
       )}
-      style={{ overflow: "visible" }}
+      style={{ overflow: "hidden" }}
     >
       {/* 免费旋转标识 */}
       {isFreeSpins && (

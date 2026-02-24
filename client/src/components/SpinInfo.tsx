@@ -47,7 +47,7 @@ export const SpinInfo: React.FC<SpinInfoProps> = ({
   lastScatterPayout,
 }) => {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2 min-h-[120px] shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2 h-[120px] overflow-hidden shadow-sm">
       {/* Status message */}
       <div className={cn(
         "text-sm font-medium text-center py-1 px-3 rounded-lg",

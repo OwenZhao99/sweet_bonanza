@@ -190,9 +190,9 @@
 /* Win symbol pop effect */
 @keyframes win-pop {
   0%   { transform: scale(1); }
-  40%  { transform: scale(1.18); }
-  70%  { transform: scale(0.95); }
-  100% { transform: scale(1.05); }
+  40%  { transform: scale(1.12); }
+  70%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
 }
 
 .animate-win-pop {
