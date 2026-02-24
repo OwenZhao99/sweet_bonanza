@@ -24,7 +24,7 @@ type RightPanel = "stats" | "paytable" | "history";
 
 
 const BET_OPTIONS = [0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
-const AUTO_SPIN_PRESETS = [10, 50, 100, 500];
+const AUTO_SPIN_PRESETS = [10, 1000, 10000, 50000];
 
 const VOLATILITY_OPTIONS: { value: VolatilityLevel; label: string; color: string; desc: string }[] = [
   { value: "low",     label: "Low",     color: "text-green-600",  desc: "Min 6 symbols, low bombs" },

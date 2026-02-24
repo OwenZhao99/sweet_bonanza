@@ -21,6 +21,7 @@ import {
   BUY_SUPER_FREE_SPINS_COST,
   setRtpMultiplier,
   getTargetRtp,
+  getRtpMultiplier,
   setVolatility,
   getVolatility,
 } from "@/lib/gameEngine";
@@ -364,6 +365,32 @@ export function useSlotGame() {
               timestamp: Date.now(),
             };
 
+            // #region agent log
+            const n = newStats.totalSpins;
+            if (n === 1 || n % 100 === 0 || n === 1000) {
+              fetch("http://127.0.0.1:7491/ingest/1ac776a0-99df-4f99-9de6-75896fb8fe70", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a04187" },
+                body: JSON.stringify({
+                  sessionId: "a04187",
+                  runId: "ui-rtp",
+                  hypothesisId: n === 1 ? "H2" : "H3",
+                  location: "useSlotGame.ts:runTumbleSequence",
+                  message: n === 1 ? "First spin RTP config" : `After ${n} spins`,
+                  data: {
+                    totalSpins: newStats.totalSpins,
+                    totalBet: newStats.totalBet,
+                    totalWin: newStats.totalWin,
+                    realRtp: newStats.realRTP,
+                    targetRtp: getTargetRtp(),
+                    rtpMultiplier: getRtpMultiplier(),
+                  },
+                  timestamp: Date.now(),
+                }),
+              }).catch(() => {});
+            }
+            // #endregion
+
             updateState((prev) => ({
               ...prev,
               phase: "idle",
@@ -581,12 +608,14 @@ export function useSlotGame() {
           initialTumbleWin += step.payout;
         }
         const initialTumbleWinAmount = initialTumbleWin * effectiveBet;
+        // Include scatter payout in stats so totalWin/realRTP reflect full win (H1 fix)
+        const winMultiplierForStats = initialTumbleWin + spinResult.scatterPayout;
 
-        // Update stats: record this spin's bet, tumble win, and bonus trigger
+        // Update stats: record this spin's bet, tumble + scatter win, and bonus trigger
         const bonusStats = updateStats(
           currentState.stats,
           effectiveBet,
-          initialTumbleWin,
+          winMultiplierForStats,
           initialTumbleSteps.length,
           true // triggersBonus = true
         );
@@ -843,7 +872,8 @@ export function useSlotGame() {
     setRtpMultiplier(clamped);
     updateState((prev) => ({
       ...prev,
-      message: `Target RTP set to ${clamped.toFixed(1)}% (multiplier: ${(clamped / 96.53).toFixed(3)}x)`,
+      // BASE_RTP_PERCENT must match the value in gameEngine.ts
+      message: `Target RTP set to ${clamped.toFixed(1)}% (multiplier: ${(clamped / 26.13).toFixed(3)}x)`,
     }));
   }, [updateState]);
 
