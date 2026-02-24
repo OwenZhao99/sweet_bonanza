@@ -56,7 +56,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#ef4444",
     bgColor: "#7f1d1d",
     weight: 3,
-    pays: { 6: 5, 7: 7.5, 8: 10, 9: 10, 10: 25, 11: 25, 12: 50 },
+    pays: { 8: 10, 9: 10, 10: 25, 11: 25, 12: 50 },
   },
   {
     id: "purple",
@@ -65,7 +65,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#a855f7",
     bgColor: "#4a1d96",
     weight: 4,
-    pays: { 6: 1.25, 7: 1.75, 8: 2.5, 9: 2.5, 10: 10, 11: 10, 12: 25 },
+    pays: { 8: 2.5, 9: 2.5, 10: 10, 11: 10, 12: 25 },
   },
   {
     id: "green",
@@ -74,7 +74,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#22c55e",
     bgColor: "#14532d",
     weight: 4,
-    pays: { 6: 1, 7: 1.5, 8: 2, 9: 2, 10: 5, 11: 5, 12: 15 },
+    pays: { 8: 2, 9: 2, 10: 5, 11: 5, 12: 15 },
   },
   {
     id: "blue",
@@ -83,7 +83,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#3b82f6",
     bgColor: "#1e3a8a",
     weight: 5,
-    pays: { 6: 0.75, 7: 1, 8: 1.5, 9: 1.5, 10: 2, 11: 2, 12: 12 },
+    pays: { 8: 1.5, 9: 1.5, 10: 2, 11: 2, 12: 12 },
   },
   {
     id: "apple",
@@ -92,7 +92,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#dc2626",
     bgColor: "#7f1d1d",
     weight: 5,
-    pays: { 6: 0.5, 7: 0.75, 8: 1, 9: 1, 10: 1.5, 11: 1.5, 12: 10 },
+    pays: { 8: 1, 9: 1, 10: 1.5, 11: 1.5, 12: 10 },
   },
   {
     id: "plum",
@@ -101,7 +101,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#7c3aed",
     bgColor: "#3b0764",
     weight: 6,
-    pays: { 6: 0.4, 7: 0.6, 8: 0.8, 9: 0.8, 10: 1.2, 11: 1.2, 12: 8 },
+    pays: { 8: 0.8, 9: 0.8, 10: 1.2, 11: 1.2, 12: 8 },
   },
   {
     id: "watermelon",
@@ -110,7 +110,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#16a34a",
     bgColor: "#14532d",
     weight: 6,
-    pays: { 6: 0.25, 7: 0.35, 8: 0.5, 9: 0.5, 10: 1, 11: 1, 12: 5 },
+    pays: { 8: 0.5, 9: 0.5, 10: 1, 11: 1, 12: 5 },
   },
   {
     id: "grape",
@@ -119,7 +119,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#9333ea",
     bgColor: "#3b0764",
     weight: 7,
-    pays: { 6: 0.2, 7: 0.3, 8: 0.4, 9: 0.4, 10: 0.9, 11: 0.9, 12: 4 },
+    pays: { 8: 0.4, 9: 0.4, 10: 0.9, 11: 0.9, 12: 4 },
   },
   {
     id: "banana",
@@ -128,7 +128,7 @@ export const SYMBOLS: Symbol[] = [
     color: "#eab308",
     bgColor: "#713f12",
     weight: 8,
-    pays: { 6: 0.12, 7: 0.18, 8: 0.25, 9: 0.25, 10: 0.75, 11: 0.75, 12: 2 },
+    pays: { 8: 0.25, 9: 0.25, 10: 0.75, 11: 0.75, 12: 2 },
   },
   {
     id: "scatter",

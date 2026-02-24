@@ -51,7 +51,7 @@ export const Paytable: React.FC = () => {
         {activeTab === "paytable" && (
           <div className="space-y-1">
             <p className="text-xs text-slate-400 mb-3">
-              ≥ 8 matching symbols anywhere on the grid wins. Payout = multiplier × bet.
+              Min. 8 matching symbols anywhere on the grid wins. Payout = multiplier × bet.
             </p>
             {paytable.map(({ symbol, pays }) => {
               const shape = SYMBOL_SHAPES[symbol.id];
