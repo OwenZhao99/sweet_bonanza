@@ -175,7 +175,9 @@ export function useSlotGame() {
       const anim = stateRef.current.animationsEnabled;
 
       if (steps.length === 0) {
-        const newStats = updateStats(currentStats, betAmount, 0, 0, false);
+        // In free spins, don't count bet or spins (already counted in the triggering spin)
+        const statsBet = isFreeSpins ? 0 : betAmount;
+        const newStats = updateStats(currentStats, statsBet, 0, 0, false, isFreeSpins, betAmount);
         let newPhase: GamePhase = "idle";
         let message = "No win — try again!";
 
@@ -248,12 +250,16 @@ export function useSlotGame() {
       const playNextStep = () => {
         if (stepIndex >= steps.length) {
           const totalWin = cumulativeWin * betAmount;
+          // In free spins, don't count bet or spins (already counted in the triggering spin)
+          const statsBet = isFreeSpins ? 0 : betAmount;
           const newStats = updateStats(
             currentStats,
-            betAmount,
+            statsBet,
             cumulativeWin,
             steps.length,
-            spinResult.triggersBonus
+            spinResult.triggersBonus,
+            isFreeSpins,
+            betAmount
           );
 
           // In animation mode, balance was already added step-by-step.
@@ -548,6 +554,38 @@ export function useSlotGame() {
           ...prev,
           autoSpinBetAmount: effectiveBet,
         }));
+
+        // --- FIX: Record the bonus trigger in stats and compute initial tumble win ---
+        const initialTumbleSteps = spinResult.tumbleSteps;
+        let initialTumbleWin = 0;
+        for (const step of initialTumbleSteps) {
+          initialTumbleWin += step.payout;
+        }
+        const initialTumbleWinAmount = initialTumbleWin * effectiveBet;
+
+        // Update stats: record this spin's bet, tumble win, and bonus trigger
+        const bonusStats = updateStats(
+          currentState.stats,
+          effectiveBet,
+          initialTumbleWin,
+          initialTumbleSteps.length,
+          true // triggersBonus = true
+        );
+
+        // Add initial tumble win to balance
+        if (initialTumbleWinAmount > 0) {
+          updateState((prev) => ({
+            ...prev,
+            balance: prev.balance + initialTumbleWinAmount,
+            stats: bonusStats,
+          }));
+        } else {
+          updateState((prev) => ({
+            ...prev,
+            stats: bonusStats,
+          }));
+        }
+
         timerRef.current = setTimeout(() => {
           updateState((prev) => ({
             ...prev,
@@ -564,7 +602,7 @@ export function useSlotGame() {
               isSuperFreeSpins: false,
               freeSpinsRemaining: FREE_SPINS_BASE,
               freeSpinsTotal: FREE_SPINS_BASE,
-              freeSpinsTotalWin: scatterPayout,
+              freeSpinsTotalWin: scatterPayout + initialTumbleWinAmount,
               balance: prev.balance + scatterPayout,
               message: `Free Spins started! ${FREE_SPINS_BASE} spins`,
             }));
@@ -588,7 +626,7 @@ export function useSlotGame() {
                 effectiveBet,
                 true,
                 FREE_SPINS_BASE,
-                scatterPayout,
+                scatterPayout + initialTumbleWinAmount,
                 fsState.stats
               );
             }, anim ? 500 : 0);

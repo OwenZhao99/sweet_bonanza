@@ -749,17 +749,21 @@ export function updateStats(
   bet: number,
   winMultiplier: number,
   tumbleCount: number,
-  triggeredBonus: boolean
+  triggeredBonus: boolean,
+  isFreeSpinRound: boolean = false,
+  actualBet?: number
 ): GameStats {
-  const winAmount = bet * winMultiplier;
+  // For FS rounds: bet=0 (don't count bet/spins), but use actualBet for win calculation
+  const effectiveBetForWin = actualBet !== undefined ? actualBet : bet;
+  const winAmount = effectiveBetForWin * winMultiplier;
   const newStats = {
     ...stats,
-    totalSpins: stats.totalSpins + 1,
+    totalSpins: isFreeSpinRound ? stats.totalSpins : stats.totalSpins + 1,
     totalBet: stats.totalBet + bet,
     totalWin: stats.totalWin + winAmount,
     freeSpinsTriggered: stats.freeSpinsTriggered + (triggeredBonus ? 1 : 0),
-    tumbleHistory: [...stats.tumbleHistory.slice(-49), tumbleCount],
-    winHistory: [...stats.winHistory.slice(-49), winMultiplier],
+    tumbleHistory: isFreeSpinRound ? stats.tumbleHistory : [...stats.tumbleHistory.slice(-49), tumbleCount],
+    winHistory: isFreeSpinRound ? stats.winHistory : [...stats.winHistory.slice(-49), winMultiplier],
   };
   newStats.realRTP = newStats.totalBet > 0
     ? (newStats.totalWin / newStats.totalBet) * 100
