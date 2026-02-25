@@ -527,6 +527,9 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                 updateState((prev) => ({
                   ...prev,
                   phase: "free_spins_end",
+                  // Ensure UI reflects final post-tumble state for this spin (important in turbo mode)
+                  grid: fortuneSpin.finalGrid,
+                  multipliers: fortuneSpin.finalMultipliers,
                   winPositions: [],
                   currentWinSymbol: null,
                   balance: prev.balance,
@@ -547,6 +550,9 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                 updateState((prev) => ({
                   ...prev,
                   phase: "free_spins_spinning",
+                  // Ensure UI reflects final post-tumble state for this spin (important in turbo mode)
+                  grid: fortuneSpin.finalGrid,
+                  multipliers: fortuneSpin.finalMultipliers,
                   winPositions: [],
                   currentWinSymbol: null,
                   balance: prev.balance,
@@ -602,6 +608,9 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
               updateState((prev) => ({
                 ...prev,
                 phase: "idle",
+                // Ensure the UI shows the true post-tumble final state (important in turbo mode)
+                grid: fortuneSpin.finalGrid,
+                multipliers: fortuneSpin.finalMultipliers,
                 winPositions: [],
                 currentWinSymbol: null,
                 droppingPositions: [],
