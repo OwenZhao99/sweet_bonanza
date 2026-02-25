@@ -2,13 +2,13 @@
  * Sweet Bonanza 1000 Replica - Game State Management Hook
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
-  GridCell,
-  MultiplierCell,
-  FullSpinResult,
+  GridCell as SweetGridCell,
+  MultiplierCell as SweetMultiplierCell,
+  FullSpinResult as SweetFullSpinResult,
   GameStats,
-  TumbleStep,
+  TumbleStep as SweetTumbleStep,
   VolatilityLevel,
   spin,
   createInitialStats,
@@ -25,6 +25,13 @@ import {
   setVolatility,
   getVolatility,
 } from "@/lib/gameEngine";
+import * as Olympus from "@/lib/gameEngineOlympus";
+import type {
+  GridCell as OlympusGridCell,
+  MultiplierCell as OlympusMultiplierCell,
+  FullSpinResult as OlympusFullSpinResult,
+  TumbleStep as OlympusTumbleStep,
+} from "@/lib/gameEngineOlympus";
 
 export type GamePhase =
   | "idle"
@@ -37,6 +44,8 @@ export type GamePhase =
   | "result";
 
 export type AnteBetMode = "none" | "x20" | "x25";
+
+export type GameId = "sweet-bonanza-1000" | "gates-of-olympus-1000";
 
 // ============================================================
 // Spin History Record
@@ -57,14 +66,15 @@ export interface SpinRecord {
 export interface GameState {
   balance: number;
   bet: number;
-  grid: GridCell[];
-  multipliers: MultiplierCell[];
+  gameId: GameId;
+  grid: (SweetGridCell | OlympusGridCell)[];
+  multipliers: (SweetMultiplierCell | OlympusMultiplierCell)[];
   winPositions: number[];
   currentWinSymbol: string | null;
   phase: GamePhase;
-  currentSpinResult: FullSpinResult | null;
+  currentSpinResult: (SweetFullSpinResult | OlympusFullSpinResult) | null;
   currentTumbleIndex: number;
-  currentTumbleStep: TumbleStep | null;
+  currentTumbleStep: (SweetTumbleStep | OlympusTumbleStep) | null;
   spinWin: number;
   spinWinMultiplier: number;
   freeSpinsRemaining: number;
@@ -77,6 +87,9 @@ export interface GameState {
   lastScatterCount: number;
   lastScatterPayout: number;
   currentMultiplierTotal: number;
+  featureMultiplierMeter: number; // Olympus FS running total multiplier
+  lastFinalMultiplierSum: number; // Olympus final multiplier sum (per sequence)
+  savedOlympusFsMultiplierChance: number | null;
   message: string;
   autoSpin: boolean;
   autoSpinCount: number;
@@ -95,13 +108,14 @@ export interface GameState {
 const DEFAULT_BET = 1;
 const DEFAULT_BALANCE = 100000;
 
-function createInitialGrid(): GridCell[] {
+function createInitialGrid(): (SweetGridCell | OlympusGridCell)[] {
   return Array(GRID_SIZE).fill(null);
 }
 
 const INITIAL_STATE: GameState = {
   balance: DEFAULT_BALANCE,
   bet: DEFAULT_BET,
+  gameId: "sweet-bonanza-1000",
   grid: createInitialGrid(),
   multipliers: Array(GRID_SIZE).fill(null),
   winPositions: [],
@@ -122,6 +136,9 @@ const INITIAL_STATE: GameState = {
   lastScatterCount: 0,
   lastScatterPayout: 0,
   currentMultiplierTotal: 0,
+  featureMultiplierMeter: 0,
+  lastFinalMultiplierSum: 0,
+  savedOlympusFsMultiplierChance: null,
   message: "Press SPIN to start",
   autoSpin: false,
   autoSpinCount: 0,
@@ -134,11 +151,28 @@ const INITIAL_STATE: GameState = {
   droppingPositions: [],
 };
 
-export function useSlotGame() {
-  const [state, setState] = useState<GameState>(INITIAL_STATE);
+export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
+  const [state, setState] = useState<GameState>({ ...INITIAL_STATE, gameId });
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stateRef = useRef<GameState>(INITIAL_STATE);
+  const stateRef = useRef<GameState>({ ...INITIAL_STATE, gameId });
   const autoSpinStopRef = useRef<boolean>(false);
+
+  // Reset on game switch (avoid mixing timers / engine state)
+  useEffect(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    autoSpinStopRef.current = false;
+    const fresh: GameState = {
+      ...INITIAL_STATE,
+      gameId,
+      stats: createInitialStats(),
+      message: gameId === "gates-of-olympus-1000" ? "Press SPIN to start (Olympus)" : "Press SPIN to start",
+    };
+    stateRef.current = fresh;
+    setState(fresh);
+  }, [gameId]);
 
   const updateState = useCallback((updater: (prev: GameState) => GameState) => {
     setState((prev) => {
@@ -165,7 +199,7 @@ export function useSlotGame() {
 
   const runTumbleSequence = useCallback(
     (
-      spinResult: FullSpinResult,
+      spinResult: SweetFullSpinResult | OlympusFullSpinResult,
       betAmount: number,
       isFreeSpins: boolean,
       currentFreeSpinsRemaining: number,
@@ -174,6 +208,7 @@ export function useSlotGame() {
     ) => {
       const steps = spinResult.tumbleSteps;
       const anim = stateRef.current.animationsEnabled;
+      const activeIsOlympus = stateRef.current.gameId === "gates-of-olympus-1000";
 
       if (steps.length === 0) {
         // In free spins, don't count bet or spins (already counted in the triggering spin)
@@ -209,7 +244,9 @@ export function useSlotGame() {
             }));
             timerRef.current = setTimeout(() => {
               const fsState = stateRef.current;
-              const fsResult = spin(true, fsState.isSuperFreeSpins, false);
+              const fsResult = activeIsOlympus
+                ? Olympus.spin(true, false, false)
+                : spin(true, fsState.isSuperFreeSpins, false);
               updateState((prev) => ({
                 ...prev,
                 grid: fsResult.initialGrid,
@@ -250,9 +287,152 @@ export function useSlotGame() {
 
       const playNextStep = () => {
         if (stepIndex >= steps.length) {
+          if (activeIsOlympus) {
+            const olympusSpin = spinResult as OlympusFullSpinResult;
+            const finalMultiplierSum = olympusSpin.finalMultiplierSum || 0;
+
+            const meterBefore = stateRef.current.featureMultiplierMeter || 0;
+            const shouldApplyMeter = isFreeSpins && cumulativeWin > 0 && finalMultiplierSum > 0;
+            const meterAfter = shouldApplyMeter ? meterBefore + finalMultiplierSum : meterBefore;
+
+            let finalWinMultiplier = cumulativeWin;
+            if (!isFreeSpins) {
+              finalWinMultiplier = cumulativeWin * (finalMultiplierSum > 0 ? finalMultiplierSum : 1);
+            } else {
+              finalWinMultiplier = shouldApplyMeter ? cumulativeWin * meterAfter : cumulativeWin;
+            }
+
+            // Max win cap (Olympus): 15,000x
+            const OLYMPUS_MAX_WIN = 15000;
+            if (!isFreeSpins && finalWinMultiplier > OLYMPUS_MAX_WIN) {
+              finalWinMultiplier = OLYMPUS_MAX_WIN;
+            }
+
+            const totalWin = finalWinMultiplier * betAmount;
+            const statsBet = isFreeSpins ? 0 : betAmount;
+            const newStats = updateStats(
+              currentStats,
+              statsBet,
+              finalWinMultiplier,
+              steps.length,
+              spinResult.triggersBonus,
+              isFreeSpins,
+              betAmount,
+            );
+
+            if (isFreeSpins) {
+              let newTotalWin = currentFreeSpinsTotalWin + totalWin;
+              let newRemaining = currentFreeSpinsRemaining - 1;
+              const retriggered = spinResult.scatterCount >= Olympus.SCATTER_RETRIGGER_FS;
+              if (retriggered) newRemaining += Olympus.FREE_SPINS_RETRIGGER;
+
+              // Cap for FS cycle as well
+              const totalWinMultiplier = newTotalWin / betAmount;
+              if (totalWinMultiplier >= OLYMPUS_MAX_WIN) {
+                newTotalWin = OLYMPUS_MAX_WIN * betAmount;
+                newRemaining = 0;
+              }
+
+              const nextMeter = shouldApplyMeter ? meterAfter : meterBefore;
+
+              if (newRemaining <= 0) {
+                updateState((prev) => ({
+                  ...prev,
+                  phase: "free_spins_end",
+                  winPositions: [],
+                  currentWinSymbol: null,
+                  // Olympus credits FS at round end
+                  balance: prev.balance,
+                  freeSpinsRemaining: 0,
+                  freeSpinsTotalWin: newTotalWin,
+                  spinWin: totalWin,
+                  spinWinMultiplier: finalWinMultiplier,
+                  stats: newStats,
+                  featureMultiplierMeter: nextMeter,
+                  currentMultiplierTotal: nextMeter,
+                  lastFinalMultiplierSum: finalMultiplierSum,
+                  message: `Free Spins ended! Total win: ${newTotalWin.toFixed(2)}`,
+                }));
+              } else {
+                const retriggerMsg = retriggered
+                  ? `Retriggered! +${Olympus.FREE_SPINS_RETRIGGER} spins! ${newRemaining} remaining`
+                  : `${newRemaining} free spins remaining`;
+                updateState((prev) => ({
+                  ...prev,
+                  phase: "free_spins_spinning",
+                  winPositions: [],
+                  currentWinSymbol: null,
+                  balance: prev.balance,
+                  freeSpinsRemaining: newRemaining,
+                  freeSpinsTotalWin: newTotalWin,
+                  spinWin: totalWin,
+                  spinWinMultiplier: finalWinMultiplier,
+                  stats: newStats,
+                  featureMultiplierMeter: nextMeter,
+                  currentMultiplierTotal: nextMeter,
+                  lastFinalMultiplierSum: finalMultiplierSum,
+                  message: retriggerMsg,
+                }));
+                timerRef.current = setTimeout(() => {
+                  const fsResult = Olympus.spin(true, false, false);
+                  updateState((prev) => ({
+                    ...prev,
+                    grid: fsResult.initialGrid,
+                    multipliers: fsResult.initialMultipliers,
+                    winPositions: [],
+                    currentSpinResult: fsResult,
+                    lastScatterCount: fsResult.scatterCount,
+                    message: `Free spinning... ${newRemaining} left`,
+                  }));
+                  runTumbleSequence(
+                    fsResult,
+                    betAmount,
+                    true,
+                    newRemaining,
+                    newTotalWin,
+                    newStats,
+                  );
+                }, anim ? 800 : 0);
+              }
+            } else {
+              const spinNum = stateRef.current.totalSpinCounter;
+              const record: SpinRecord = {
+                id: Date.now() + Math.random(),
+                spinNumber: spinNum,
+                bet: betAmount,
+                win: totalWin,
+                multiplier: finalWinMultiplier,
+                tumbles: steps.length,
+                triggeredFS: spinResult.triggersBonus,
+                isFreeSpins: false,
+                timestamp: Date.now(),
+              };
+
+              updateState((prev) => ({
+                ...prev,
+                phase: "idle",
+                winPositions: [],
+                currentWinSymbol: null,
+                droppingPositions: [],
+                balance: prev.balance + totalWin,
+                spinWin: totalWin,
+                spinWinMultiplier: finalWinMultiplier,
+                stats: newStats,
+                lastFinalMultiplierSum: finalMultiplierSum,
+                message: totalWin > 0
+                  ? `Win: ${totalWin.toFixed(2)} (${finalWinMultiplier.toFixed(2)}x${finalMultiplierSum > 0 ? `, ×${finalMultiplierSum}` : ""})`
+                  : "No win — try again!",
+                spinHistory: [record, ...prev.spinHistory].slice(0, 1000),
+              }));
+              scheduleNextAutoSpin(betAmount);
+            }
+            return;
+          }
+
+          // === Sweet settlement ===
           // In free spins, apply final multiplier at end of tumble sequence
           if (isFreeSpins && steps.length > 0) {
-            const finalMultiplierTotal = steps[steps.length - 1].multiplierTotal;
+            const finalMultiplierTotal = (steps[steps.length - 1] as SweetTumbleStep).multiplierTotal;
             if (finalMultiplierTotal > 0) {
               cumulativeWin *= finalMultiplierTotal;
             }
@@ -428,6 +608,7 @@ export function useSlotGame() {
         );
 
         // Phase 1: Show winning symbols highlighted (500ms)
+        const sweetMultiplierTotal = activeIsOlympus ? 0 : (step as SweetTumbleStep).multiplierTotal;
         updateState((prev) => ({
           ...prev,
           phase: "tumbling",
@@ -438,9 +619,9 @@ export function useSlotGame() {
           currentWinSymbol: mainWin?.symbolId || null,
           currentTumbleIndex: stepIndex,
           currentTumbleStep: step,
-          currentMultiplierTotal: step.multiplierTotal,
-          message: isFreeSpins && step.multiplierTotal > 0
-            ? `Tumble #${stepIndex}: +${step.payout.toFixed(2)}x (Multipliers on screen: ${step.multiplierTotal}x)`
+          currentMultiplierTotal: activeIsOlympus ? (prev.featureMultiplierMeter || 0) : sweetMultiplierTotal,
+          message: !activeIsOlympus && isFreeSpins && sweetMultiplierTotal > 0
+            ? `Tumble #${stepIndex}: +${step.payout.toFixed(2)}x (Multipliers on screen: ${sweetMultiplierTotal}x)`
             : `Tumble #${stepIndex}: +${step.payout.toFixed(2)}x`,
         }));
 
@@ -484,7 +665,7 @@ export function useSlotGame() {
               grid: actualNextGrid,
               multipliers: actualNextMultipliers,
               droppingPositions: dropPositions,
-              balance: prev.balance + stepWinAmount,
+              balance: activeIsOlympus ? prev.balance : prev.balance + stepWinAmount,
               spinWin: prev.spinWin + stepWinAmount,
             }));
 
@@ -549,6 +730,7 @@ export function useSlotGame() {
       clearTimer();
 
       const currentState = stateRef.current;
+      const activeIsOlympus = currentState.gameId === "gates-of-olympus-1000";
       const anteBet25x = currentState.anteBetMode === "x25";
       const effectiveBet = currentState.anteBetMode !== "none"
         ? currentState.bet * 1.25
@@ -569,7 +751,9 @@ export function useSlotGame() {
         ? currentState.balance
         : currentState.balance - effectiveBet;
 
-      const spinResult = spin(isFreeSpins, isSuperFreeSpins, anteBet25x);
+      const spinResult = activeIsOlympus
+        ? Olympus.spin(isFreeSpins, false, anteBet25x)
+        : spin(isFreeSpins, isSuperFreeSpins, anteBet25x);
 
       // Increment spin counter
       const newSpinCounter = currentState.totalSpinCounter + 1;
@@ -585,16 +769,91 @@ export function useSlotGame() {
         currentTumbleIndex: -1,
         currentTumbleStep: null,
         currentMultiplierTotal: 0,
+        featureMultiplierMeter: activeIsOlympus ? prev.featureMultiplierMeter : prev.featureMultiplierMeter,
         spinWin: 0,
         spinWinMultiplier: 0,
         currentSpinResult: spinResult,
         lastScatterCount: spinResult.scatterCount,
         lastScatterPayout: spinResult.scatterPayout,
+        lastFinalMultiplierSum: activeIsOlympus ? (spinResult as OlympusFullSpinResult).finalMultiplierSum : prev.lastFinalMultiplierSum,
         totalSpinCounter: newSpinCounter,
         message: "Spinning...",
       }));
 
       if (!isFreeSpins && spinResult.triggersBonus) {
+        if (activeIsOlympus) {
+          // Olympus: settle triggering spin immediately, then start FS (FS wins credited at round end)
+          const steps = spinResult.tumbleSteps;
+          let baseWinMultiplier = 0;
+          for (const st of steps) baseWinMultiplier += st.payout;
+          const finalMultiplierSum = (spinResult as OlympusFullSpinResult).finalMultiplierSum || 0;
+          const finalWinMultiplier = baseWinMultiplier * (finalMultiplierSum > 0 ? finalMultiplierSum : 1);
+          const triggerWinAmount = finalWinMultiplier * effectiveBet;
+
+          const bonusStats = updateStats(
+            currentState.stats,
+            effectiveBet,
+            finalWinMultiplier,
+            steps.length,
+            true,
+          );
+
+          if (triggerWinAmount > 0) {
+            updateState((prev) => ({
+              ...prev,
+              balance: prev.balance + triggerWinAmount,
+              stats: bonusStats,
+            }));
+          } else {
+            updateState((prev) => ({ ...prev, stats: bonusStats }));
+          }
+
+          timerRef.current = setTimeout(() => {
+            updateState((prev) => ({
+              ...prev,
+              phase: "bonus_trigger",
+              message: `⚡ × ${spinResult.scatterCount} — Free Spins triggered!`,
+            }));
+
+            timerRef.current = setTimeout(() => {
+              updateState((prev) => ({
+                ...prev,
+                phase: "free_spins",
+                isFreeSpins: true,
+                isSuperFreeSpins: false,
+                freeSpinsRemaining: Olympus.FREE_SPINS_BASE,
+                freeSpinsTotal: Olympus.FREE_SPINS_BASE,
+                freeSpinsTotalWin: 0,
+                featureMultiplierMeter: 0,
+                currentMultiplierTotal: 0,
+                message: `Free Spins started! ${Olympus.FREE_SPINS_BASE} spins`,
+              }));
+
+              timerRef.current = setTimeout(() => {
+                const fsResult = Olympus.spin(true, false, false);
+                updateState((prev) => ({
+                  ...prev,
+                  grid: fsResult.initialGrid,
+                  multipliers: fsResult.initialMultipliers,
+                  winPositions: [],
+                  currentSpinResult: fsResult,
+                  lastScatterCount: fsResult.scatterCount,
+                  message: "Free spinning...",
+                }));
+                runTumbleSequence(
+                  fsResult,
+                  effectiveBet,
+                  true,
+                  Olympus.FREE_SPINS_BASE,
+                  0,
+                  stateRef.current.stats,
+                );
+              }, anim ? 500 : 0);
+            }, anim ? 2000 : 0);
+          }, anim ? 600 : 0);
+          return;
+        }
+
         // Save the current bet amount and auto spin context for restoration after free spins
         updateState((prev) => ({
           ...prev,
@@ -762,13 +1021,14 @@ export function useSlotGame() {
   const continueFreeSpins = useCallback(() => {
     const current = stateRef.current;
     if (current.freeSpinsRemaining > 0) {
-      doSpin(true, current.isSuperFreeSpins);
+      doSpin(true, current.gameId === "gates-of-olympus-1000" ? false : current.isSuperFreeSpins);
     }
   }, [doSpin]);
 
   const startFreeSpins = useCallback(
     (scatterCount: number, scatterPayout: number, superFreeSpins: boolean = false) => {
       const current = stateRef.current;
+      const activeIsOlympus = current.gameId === "gates-of-olympus-1000";
       const effectiveBet = current.anteBetMode !== "none" ? current.bet * 1.25 : current.bet;
       const scatterPayoutAmount = scatterPayout * effectiveBet;
 
@@ -776,16 +1036,19 @@ export function useSlotGame() {
         ...prev,
         phase: "free_spins",
         isFreeSpins: true,
-        isSuperFreeSpins: superFreeSpins,
-        freeSpinsRemaining: FREE_SPINS_BASE,
-        freeSpinsTotal: FREE_SPINS_BASE,
-        freeSpinsTotalWin: scatterPayoutAmount,
-        balance: prev.balance + scatterPayoutAmount,
-        message: `Free Spins started! ${FREE_SPINS_BASE} spins`,
+        isSuperFreeSpins: activeIsOlympus ? false : superFreeSpins,
+        freeSpinsRemaining: activeIsOlympus ? Olympus.FREE_SPINS_BASE : FREE_SPINS_BASE,
+        freeSpinsTotal: activeIsOlympus ? Olympus.FREE_SPINS_BASE : FREE_SPINS_BASE,
+        freeSpinsTotalWin: activeIsOlympus ? 0 : scatterPayoutAmount,
+        // Olympus credits FS at round end; Sweet credits immediately.
+        balance: activeIsOlympus ? prev.balance : prev.balance + scatterPayoutAmount,
+        featureMultiplierMeter: activeIsOlympus ? 0 : prev.featureMultiplierMeter,
+        currentMultiplierTotal: activeIsOlympus ? 0 : prev.currentMultiplierTotal,
+        message: `Free Spins started! ${(activeIsOlympus ? Olympus.FREE_SPINS_BASE : FREE_SPINS_BASE)} spins`,
       }));
 
       timerRef.current = setTimeout(() => {
-        doSpin(true, superFreeSpins);
+        doSpin(true, activeIsOlympus ? false : superFreeSpins);
       }, 300);
     },
     [updateState, doSpin]
@@ -794,7 +1057,10 @@ export function useSlotGame() {
   const handleBuyFreeSpins = useCallback(
     (superFreeSpins: boolean = false) => {
       const current = stateRef.current;
-      const cost = (superFreeSpins ? BUY_SUPER_FREE_SPINS_COST : BUY_FREE_SPINS_COST) * current.bet;
+      const activeIsOlympus = current.gameId === "gates-of-olympus-1000";
+      const cost = activeIsOlympus
+        ? Olympus.BUY_FREE_SPINS_COST * current.bet
+        : (superFreeSpins ? BUY_SUPER_FREE_SPINS_COST : BUY_FREE_SPINS_COST) * current.bet;
 
       if (current.balance < cost) {
         updateState((prev) => ({ ...prev, message: "Insufficient balance to buy!" }));
@@ -806,30 +1072,44 @@ export function useSlotGame() {
         balance: prev.balance - cost,
         phase: "free_spins",
         isFreeSpins: true,
-        isSuperFreeSpins: superFreeSpins,
-        freeSpinsRemaining: FREE_SPINS_BASE,
-        freeSpinsTotal: FREE_SPINS_BASE,
-        freeSpinsTotalWin: 0,
-        message: `Bought ${superFreeSpins ? "Super " : ""}Free Spins!`,
+        isSuperFreeSpins: activeIsOlympus ? false : superFreeSpins,
+        freeSpinsRemaining: activeIsOlympus ? Olympus.FREE_SPINS_BASE : FREE_SPINS_BASE,
+        freeSpinsTotal: activeIsOlympus ? Olympus.FREE_SPINS_BASE : FREE_SPINS_BASE,
+        // Olympus buy feature guarantees 4 scatters (3x payout) on trigger; credit at round end.
+        freeSpinsTotalWin: activeIsOlympus ? 3 * current.bet : 0,
+        featureMultiplierMeter: activeIsOlympus ? 0 : prev.featureMultiplierMeter,
+        currentMultiplierTotal: activeIsOlympus ? 0 : prev.currentMultiplierTotal,
+        message: activeIsOlympus ? "Bought Free Spins!" : `Bought ${superFreeSpins ? "Super " : ""}Free Spins!`,
       }));
 
       timerRef.current = setTimeout(() => {
-        doSpin(true, superFreeSpins);
+        doSpin(true, activeIsOlympus ? false : superFreeSpins);
       }, 300);
     },
     [updateState, doSpin]
   );
 
   const endFreeSpins = useCallback(() => {
-    updateState((prev) => ({
-      ...prev,
-      phase: "idle",
-      isFreeSpins: false,
-      isSuperFreeSpins: false,
-      freeSpinsRemaining: 0,
-      freeSpinsTotal: 0,
-      message: `Free Spins ended! Total win: ${prev.freeSpinsTotalWin.toFixed(2)}`,
-    }));
+    updateState((prev) => {
+      const activeIsOlympus = prev.gameId === "gates-of-olympus-1000";
+      const creditedBalance = activeIsOlympus ? prev.balance + prev.freeSpinsTotalWin : prev.balance;
+      if (activeIsOlympus && prev.savedOlympusFsMultiplierChance !== null) {
+        Olympus.setFreeSpinsMultiplierChance(prev.savedOlympusFsMultiplierChance);
+      }
+      return {
+        ...prev,
+        balance: creditedBalance,
+        phase: "idle",
+        isFreeSpins: false,
+        isSuperFreeSpins: false,
+        freeSpinsRemaining: 0,
+        freeSpinsTotal: 0,
+        featureMultiplierMeter: activeIsOlympus ? 0 : prev.featureMultiplierMeter,
+        currentMultiplierTotal: activeIsOlympus ? 0 : prev.currentMultiplierTotal,
+        savedOlympusFsMultiplierChance: activeIsOlympus ? null : prev.savedOlympusFsMultiplierChance,
+        message: `Free Spins ended! Total win: ${prev.freeSpinsTotalWin.toFixed(2)}`,
+      };
+    });
     // Resume auto spin if there are remaining spins
     const current = stateRef.current;
     if (!autoSpinStopRef.current && current.autoSpinRemaining > 0) {
@@ -862,28 +1142,56 @@ export function useSlotGame() {
   const resetGame = useCallback(() => {
     clearTimer();
     autoSpinStopRef.current = false;
-    const freshState = { ...INITIAL_STATE, stats: createInitialStats() };
+    const current = stateRef.current;
+    const freshState = { ...INITIAL_STATE, gameId: current.gameId, stats: createInitialStats() };
     stateRef.current = freshState;
     setState(freshState);
   }, [clearTimer]);
 
   const setTargetRtp = useCallback((targetRtp: number) => {
     const clamped = Math.max(10, Math.min(200, targetRtp));
-    setRtpMultiplier(clamped);
-    updateState((prev) => ({
-      ...prev,
-      // BASE_RTP_PERCENT must match the value in gameEngine.ts
-      message: `Target RTP set to ${clamped.toFixed(1)}% (multiplier: ${(clamped / 26.13).toFixed(3)}x)`,
-    }));
+    const activeIsOlympus = stateRef.current.gameId === "gates-of-olympus-1000";
+    if (activeIsOlympus) {
+      Olympus.setRtpMultiplier(clamped);
+      updateState((prev) => ({
+        ...prev,
+        message: `Target RTP set to ${clamped.toFixed(2)}% (Olympus)`,
+      }));
+    } else {
+      setRtpMultiplier(clamped);
+      updateState((prev) => ({
+        ...prev,
+        // BASE_RTP_PERCENT must match the value in gameEngine.ts
+        message: `Target RTP set to ${clamped.toFixed(1)}% (multiplier: ${(clamped / 26.13).toFixed(3)}x)`,
+      }));
+    }
   }, [updateState]);
 
   const setVolatilityLevel = useCallback((level: VolatilityLevel) => {
+    const activeIsOlympus = stateRef.current.gameId === "gates-of-olympus-1000";
+    if (activeIsOlympus) {
+      updateState((prev) => ({
+        ...prev,
+        message: "Volatility is fixed for Olympus (not configurable yet)",
+      }));
+      return;
+    }
     setVolatility(level);
     updateState((prev) => ({
       ...prev,
       message: `Volatility set to ${level.toUpperCase()}`,
     }));
   }, [updateState]);
+
+  const getTargetRtpLocal = useCallback(() => {
+    return stateRef.current.gameId === "gates-of-olympus-1000"
+      ? Olympus.getTargetRtp()
+      : getTargetRtp();
+  }, []);
+
+  const getVolatilityLocal = useCallback(() => {
+    return getVolatility();
+  }, []);
 
   const clearHistory = useCallback(() => {
     updateState((prev) => ({ ...prev, spinHistory: [] }));
@@ -904,9 +1212,9 @@ export function useSlotGame() {
     addBalance,
     resetGame,
     setTargetRtp,
-    getTargetRtp,
+    getTargetRtp: getTargetRtpLocal,
     setVolatilityLevel,
-    getVolatility,
+    getVolatility: getVolatilityLocal,
     clearHistory,
   };
 }

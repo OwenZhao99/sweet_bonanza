@@ -4,7 +4,9 @@
  */
 
 import React from "react";
-import { TumbleStep, SYMBOL_MAP, SymbolId } from "@/lib/gameEngine";
+import { TumbleStep, SYMBOL_MAP } from "@/lib/gameEngine";
+import { SYMBOL_MAP as OLYMPUS_SYMBOL_MAP } from "@/lib/gameEngineOlympus";
+import type { TumbleStep as OlympusTumbleStep } from "@/lib/gameEngineOlympus";
 import { GamePhase } from "@/hooks/useSlotGame";
 import { cn } from "@/lib/utils";
 
@@ -19,12 +21,18 @@ const SYMBOL_SHAPES: Record<string, { shape: string; color: string }> = {
   grape:      { shape: "🍇", color: "#6d28d9" },
   banana:     { shape: "🍌", color: "#b45309" },
   scatter:    { shape: "🍭", color: "#ea580c" },
+  crown:      { shape: "👑", color: "#facc15" },
+  hourglass:  { shape: "⌛", color: "#fb923c" },
+  ring:       { shape: "💍", color: "#fbbf24" },
+  chalice:    { shape: "🏆", color: "#22c55e" },
+  red:        { shape: "♦", color: "#ef4444" },
+  yellow:     { shape: "⬡", color: "#facc15" },
 };
 
 interface SpinInfoProps {
   phase: GamePhase;
   message: string;
-  currentTumbleStep: TumbleStep | null;
+  currentTumbleStep: TumbleStep | OlympusTumbleStep | null;
   currentTumbleIndex: number;
   spinWin: number;
   spinWinMultiplier: number;
@@ -70,7 +78,7 @@ export const SpinInfo: React.FC<SpinInfoProps> = ({
           <div className="space-y-1">
             {currentTumbleStep.wins.map((win, i) => {
               const shape = SYMBOL_SHAPES[win.symbolId];
-              const sym = SYMBOL_MAP[win.symbolId];
+                  const sym = (SYMBOL_MAP as any)[win.symbolId] || (OLYMPUS_SYMBOL_MAP as any)[win.symbolId];
               return (
                 <div
                   key={i}
@@ -90,7 +98,7 @@ export const SpinInfo: React.FC<SpinInfoProps> = ({
           </div>
 
           {/* Multiplier calculation (free spins) */}
-          {isFreeSpins && currentTumbleStep.multiplierTotal > 0 && (
+              {isFreeSpins && (currentTumbleStep as any).multiplierTotal > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded p-2">
               <div className="text-[10px] text-amber-600 mb-1">Multiplier Bomb Calculation</div>
               <div className="flex items-center gap-2 text-xs">
@@ -99,11 +107,11 @@ export const SpinInfo: React.FC<SpinInfoProps> = ({
                 </span>
                 <span className="text-slate-400">×</span>
                 <span className="text-amber-600 font-mono font-bold">
-                  {currentTumbleStep.multiplierTotal}x
+                      {(currentTumbleStep as any).multiplierTotal}x
                 </span>
                 <span className="text-slate-400">=</span>
                 <span className="text-green-600 font-mono font-bold">
-                  {(currentTumbleStep.payout * currentTumbleStep.multiplierTotal).toFixed(2)}x
+                      {(currentTumbleStep.payout * (currentTumbleStep as any).multiplierTotal).toFixed(2)}x
                 </span>
               </div>
             </div>

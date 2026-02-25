@@ -5,20 +5,18 @@
  */
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useSlotGame, SpinRecord } from "@/hooks/useSlotGame";
+import { useSlotGame, SpinRecord, type GameId } from "@/hooks/useSlotGame";
 import { GameGrid } from "@/components/GameGrid";
 import { StatsPanel } from "@/components/StatsPanel";
 import { Paytable } from "@/components/Paytable";
+import { PaytableOlympus } from "@/components/PaytableOlympus";
 import { SpinInfo } from "@/components/SpinInfo";
 import { MathModelModal } from "@/components/MathModelModal";
 import { MathDocModal } from "@/components/MathDocModal";
 import { GameSidebar } from "@/components/GameSidebar";
 import { cn } from "@/lib/utils";
-import {
-  BUY_FREE_SPINS_COST,
-  BUY_SUPER_FREE_SPINS_COST,
-  VolatilityLevel,
-} from "@/lib/gameEngine";
+import { BUY_FREE_SPINS_COST, BUY_SUPER_FREE_SPINS_COST, VolatilityLevel } from "@/lib/gameEngine";
+import { BUY_FREE_SPINS_COST as OLYMPUS_BUY_FREE_SPINS_COST } from "@/lib/gameEngineOlympus";
 
 type RightPanel = "stats" | "paytable" | "history";
 
@@ -57,6 +55,8 @@ function downloadCSV(records: SpinRecord[]) {
 }
 
 export default function Home() {
+  const [activeGameId, setActiveGameId] = useState<GameId>("sweet-bonanza-1000");
+  const isSweet = activeGameId === "sweet-bonanza-1000";
   const {
     state,
     startSpin,
@@ -74,7 +74,7 @@ export default function Home() {
     setVolatilityLevel,
     getVolatility,
     clearHistory,
-  } = useSlotGame();
+  } = useSlotGame(activeGameId);
 
   const [rightPanel, setRightPanel] = useState<RightPanel>("stats");
   const [autoSpinInput, setAutoSpinInput] = useState<string>("100");
@@ -82,7 +82,6 @@ export default function Home() {
   const [showMathModel, setShowMathModel] = useState(false);
   const [showMathDoc, setShowMathDoc] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeGameId, setActiveGameId] = useState("sweet-bonanza-1000");
   const currentTargetRtp = getTargetRtp();
   const currentVolatility = getVolatility();
 
@@ -141,8 +140,14 @@ export default function Home() {
   const effectiveBet = anteBetMode !== "none" ? bet * 1.25 : bet;
   const canSpin = !isActive && !isFreeSpins && !isAutoSpinning && balance >= effectiveBet;
   const canAutoSpin = !isActive && !isFreeSpins && !isAutoSpinning && balance >= effectiveBet;
-  const buyFSCost = BUY_FREE_SPINS_COST * bet;
+  const buyFSCost = (isSweet ? BUY_FREE_SPINS_COST : OLYMPUS_BUY_FREE_SPINS_COST) * bet;
   const buySFSCost = BUY_SUPER_FREE_SPINS_COST * bet;
+
+  const gameTitle = isSweet ? "Sweet Bonanza 1000" : "Gates of Olympus 1000";
+  const gameLink = isSweet
+    ? "https://www.pragmaticplay.com/en/games/sweet-bonanza-1000/"
+    : "https://www.pragmaticplay.com/en/games/gates-of-olympus-1000/";
+  const gameMaxWinText = isSweet ? "25,000x" : "15,000x";
 
   const autoSpinProgress = autoSpinTotal > 0
     ? ((autoSpinTotal - autoSpinRemaining) / autoSpinTotal) * 100
@@ -158,12 +163,14 @@ export default function Home() {
       {/* ===== Original Game Link ===== */}
       <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-2 text-center">
         <a
-          href="https://www.pragmaticplay.com/en/games/sweet-bonanza-1000/"
+          href={gameLink}
           target="_blank"
           rel="noopener noreferrer"
           className="text-white text-xs font-semibold hover:underline inline-flex items-center gap-1.5"
         >
-          <span>Play Original Sweet Bonanza 1000 by Pragmatic Play</span>
+          <span>
+            Play Original {gameTitle} by Pragmatic Play
+          </span>
           <span>→</span>
         </a>
       </div>
@@ -171,7 +178,7 @@ export default function Home() {
       {/* ===== Header ===== */}
       <header className="flex items-center justify-between px-4 py-1.5 border-b border-slate-200 bg-white shrink-0 shadow-sm">
         <div className="flex items-center gap-3">
-          <h1 className="text-sm font-bold text-orange-600 tracking-tight">Sweet Bonanza 1000</h1>
+          <h1 className="text-sm font-bold text-orange-600 tracking-tight">{gameTitle}</h1>
           {isFreeSpins && (
             <span className="bg-yellow-100 border border-yellow-400 text-yellow-700 text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
               ⭐ Free Spins ×{freeSpinsRemaining}
@@ -207,7 +214,7 @@ export default function Home() {
           </button>
           {[
             { label: "Target RTP", value: `${currentTargetRtp.toFixed(2)}%`, color: "text-green-600" },
-            { label: "Max Win", value: "25,000x", color: "text-amber-600" },
+            { label: "Max Win", value: gameMaxWinText, color: "text-amber-600" },
             { label: "Volatility", value: currentVolatility.toUpperCase(), color: VOLATILITY_OPTIONS.find(o => o.value === currentVolatility)?.color || "text-slate-500" },
             {
               label: "Actual RTP",
@@ -233,7 +240,7 @@ export default function Home() {
           activeGameId={activeGameId}
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          onSelectGame={(id) => setActiveGameId(id)}
+          onSelectGame={(id) => setActiveGameId(id as GameId)}
         />
 
         {/* ---- Left Control Panel ---- */}
@@ -436,18 +443,20 @@ export default function Home() {
               >
                 Buy Free Spins <span className="font-mono">{buyFSCost.toFixed(0)}×</span>
               </button>
-              <button
-                onClick={() => handleBuyFreeSpins(true)}
-                disabled={isActive || isFreeSpins || isAutoSpinning || balance < buySFSCost}
-                className={cn(
-                  "w-full py-1.5 rounded text-xs font-medium border transition-all",
-                  !isActive && !isAutoSpinning && balance >= buySFSCost
-                    ? "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
-                    : "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
-                )}
-              >
-                Buy Super FS <span className="font-mono">{buySFSCost.toFixed(0)}×</span>
-              </button>
+              {isSweet && (
+                <button
+                  onClick={() => handleBuyFreeSpins(true)}
+                  disabled={isActive || isFreeSpins || isAutoSpinning || balance < buySFSCost}
+                  className={cn(
+                    "w-full py-1.5 rounded text-xs font-medium border transition-all",
+                    !isActive && !isAutoSpinning && balance >= buySFSCost
+                      ? "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
+                      : "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                  )}
+                >
+                  Buy Super FS <span className="font-mono">{buySFSCost.toFixed(0)}×</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -629,7 +638,7 @@ export default function Home() {
                   targetRtp={currentTargetRtp}
                 />
               ) : rightPanel === "paytable" ? (
-                <Paytable />
+                isSweet ? <Paytable /> : <PaytableOlympus />
               ) : (
                 <HistoryPanel
                   records={spinHistory}

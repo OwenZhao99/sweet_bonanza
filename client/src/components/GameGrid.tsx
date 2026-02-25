@@ -7,11 +7,16 @@
 
 import React, { useEffect, useState } from "react";
 import { GridCell, MultiplierCell, SYMBOL_MAP, GRID_COLS, GRID_ROWS } from "@/lib/gameEngine";
+import { SYMBOL_MAP as OLYMPUS_SYMBOL_MAP } from "@/lib/gameEngineOlympus";
+import type { GridCell as OlympusGridCell, MultiplierCell as OlympusMultiplierCell } from "@/lib/gameEngineOlympus";
 import { cn } from "@/lib/utils";
 
+type AnyGridCell = GridCell | OlympusGridCell;
+type AnyMultiplierCell = MultiplierCell | OlympusMultiplierCell;
+
 interface GameGridProps {
-  grid: GridCell[];
-  multipliers: MultiplierCell[];
+  grid: AnyGridCell[];
+  multipliers: AnyMultiplierCell[];
   winPositions: number[];
   currentWinSymbol: string | null;
   isSpinning: boolean;
@@ -31,11 +36,20 @@ const SYMBOL_SHAPES: Record<string, { shape: string; color: string; bg: string }
   grape:      { shape: "🍇", color: "#6d28d9", bg: "rgba(245,243,255,0.95)" },
   banana:     { shape: "🍌", color: "#b45309", bg: "rgba(255,251,235,0.95)" },
   scatter:    { shape: "🍭", color: "#ea580c", bg: "rgba(255,247,237,0.95)" },
+  // Olympus
+  crown:      { shape: "👑", color: "#facc15", bg: "rgba(254,249,195,0.95)" },
+  hourglass:  { shape: "⌛", color: "#fb923c", bg: "rgba(255,237,213,0.95)" },
+  ring:       { shape: "💍", color: "#fbbf24", bg: "rgba(254,249,195,0.95)" },
+  chalice:    { shape: "🏆", color: "#22c55e", bg: "rgba(220,252,231,0.95)" },
+  red:        { shape: "♦",  color: "#ef4444", bg: "rgba(254,226,226,0.95)" },
+  yellow:     { shape: "⬡",  color: "#facc15", bg: "rgba(254,249,195,0.95)" },
+  // purple already exists
+  // green/blue already exist
 };
 
 interface CellProps {
-  symbolId: GridCell;
-  multiplier: MultiplierCell;
+  symbolId: AnyGridCell;
+  multiplier: AnyMultiplierCell;
   isWin: boolean;
   isScatter: boolean;
   index: number;
@@ -72,7 +86,7 @@ const Cell: React.FC<CellProps> = ({
   }
 
   const shape = SYMBOL_SHAPES[symbolId];
-  const sym = SYMBOL_MAP[symbolId];
+  const sym = (SYMBOL_MAP as any)[symbolId] || (OLYMPUS_SYMBOL_MAP as any)[symbolId];
 
   // Calculate drop distance in % of cell height (each row = 100%)
   const dropDistance = dropRow > 0 ? dropRow * 120 : 150;

@@ -28,6 +28,16 @@ const GAME_LIST: GameEntry[] = [
     status: "active",
     category: "Cluster Pays",
   },
+  {
+    id: "gates-of-olympus-1000",
+    name: "Gates of Olympus 1000",
+    provider: "Pragmatic Play",
+    icon: "⚡",
+    rtp: 96.5,
+    volatility: "Very High",
+    status: "active",
+    category: "Cluster Pays",
+  },
 ];
 
 const CATEGORIES = ["All", "Cluster Pays", "Paylines"];
