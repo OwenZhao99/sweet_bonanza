@@ -5,11 +5,18 @@
 
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
-import { AnteBetMode, GamePhase } from "@/hooks/useSlotGame";
+import { AnteBetMode, GamePhase, GameId } from "@/hooks/useSlotGame";
 import {
   BUY_FREE_SPINS_COST,
   BUY_SUPER_FREE_SPINS_COST,
 } from "@/lib/gameEngine";
+import {
+  BET_MULTIPLIERS as FORTUNE_BET_MULTIPLIERS,
+  BUY_FREE_SPINS_COST as FORTUNE_BUY_FREE_SPINS_COST,
+  BUY_SUPER_FREE_SPINS_COST as FORTUNE_BUY_SUPER_FREE_SPINS_COST,
+} from "@/lib/gameEngineFortuneOlympus";
+import { BUY_FREE_SPINS_COST as OLYMPUS_BUY_FREE_SPINS_COST } from "@/lib/gameEngineOlympus";
+import type { FortuneBetMode } from "@/lib/gameEngineFortuneOlympus";
 
 const BET_OPTIONS = [0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
 const AUTO_SPIN_PRESETS = [10, 50, 100, 500];
@@ -18,7 +25,9 @@ interface GameControlsProps {
   balance: number;
   bet: number;
   phase: GamePhase;
+  gameId?: GameId;
   anteBetMode: AnteBetMode;
+  fortuneBetMode?: FortuneBetMode;
   isFreeSpins: boolean;
   freeSpinsRemaining: number;
   autoSpinRemaining: number;
@@ -31,6 +40,7 @@ interface GameControlsProps {
   onToggleAnimations: () => void;
   onBetChange: (bet: number) => void;
   onAnteBetChange: (mode: AnteBetMode) => void;
+  onFortuneBetChange?: (mode: FortuneBetMode) => void;
   onBuyFreeSpins: (superFreeSpins: boolean) => void;
   onAddBalance: (amount: number) => void;
   onReset: () => void;
@@ -41,7 +51,9 @@ export const GameControls: React.FC<GameControlsProps> = ({
   balance,
   bet,
   phase,
+  gameId = "sweet-bonanza-1000",
   anteBetMode,
+  fortuneBetMode = "normal",
   isFreeSpins,
   freeSpinsRemaining,
   autoSpinRemaining,
@@ -54,6 +66,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
   onToggleAnimations,
   onBetChange,
   onAnteBetChange,
+  onFortuneBetChange,
   onBuyFreeSpins,
   onAddBalance,
   onReset,
@@ -64,12 +77,21 @@ export const GameControls: React.FC<GameControlsProps> = ({
 
   const isActive = phase === "spinning" || phase === "tumbling" || phase === "bonus_trigger";
   const isAutoSpinning = autoSpinRemaining > 0;
-  const effectiveBet = anteBetMode !== "none" ? bet * 1.25 : bet;
+  const isSweet = gameId === "sweet-bonanza-1000";
+  const isOlympus = gameId === "gates-of-olympus-1000";
+  const isFortune = gameId === "fortune-of-olympus";
+  const fortuneIsSuper = isFortune && (fortuneBetMode === "super1" || fortuneBetMode === "super2");
+
+  const effectiveBet = isFortune
+    ? bet * FORTUNE_BET_MULTIPLIERS[fortuneBetMode]
+    : anteBetMode !== "none"
+    ? bet * 1.25
+    : bet;
   const canSpin = !isActive && !isAutoSpinning && balance >= effectiveBet;
   const canAutoSpin = !isActive && !isFreeSpins && !isAutoSpinning && balance >= effectiveBet;
 
-  const buyFSCost = BUY_FREE_SPINS_COST * bet;
-  const buySFSCost = BUY_SUPER_FREE_SPINS_COST * bet;
+  const buyFSCost = (isSweet ? BUY_FREE_SPINS_COST : isOlympus ? OLYMPUS_BUY_FREE_SPINS_COST : FORTUNE_BUY_FREE_SPINS_COST) * (isFortune ? effectiveBet : bet);
+  const buySFSCost = (isSweet ? BUY_SUPER_FREE_SPINS_COST : FORTUNE_BUY_SUPER_FREE_SPINS_COST) * (isFortune ? effectiveBet : bet);
   const canBuyFS = !isActive && !isFreeSpins && !isAutoSpinning && anteBetMode === "none" && balance >= buyFSCost;
   const canBuySFS = !isActive && !isFreeSpins && !isAutoSpinning && anteBetMode === "none" && balance >= buySFSCost;
 
@@ -127,32 +149,65 @@ export const GameControls: React.FC<GameControlsProps> = ({
         </div>
       </div>
 
-      {/* 前注选项 */}
-      <div>
-        <div className="text-[9px] text-slate-500 uppercase tracking-wide mb-1">前注 (Ante Bet)</div>
-        <div className="space-y-1">
-          {([
-            { mode: "none" as AnteBetMode, label: "关闭" },
-            { mode: "x20" as AnteBetMode, label: "+25% 可购买FS" },
-            { mode: "x25" as AnteBetMode, label: "+25% 散落×2" },
-          ]).map(({ mode, label }) => (
-            <button
-              key={mode}
-              onClick={() => onAnteBetChange(mode)}
-              disabled={isActive || isFreeSpins || isAutoSpinning}
-              className={cn(
-                "w-full py-1 rounded text-xs font-medium transition-all text-left px-2",
-                anteBetMode === mode
-                  ? "bg-blue-600/80 text-white"
-                  : "bg-slate-700/40 text-slate-400 hover:bg-slate-600/40",
-                (isActive || isFreeSpins || isAutoSpinning) && "opacity-50 cursor-not-allowed"
-              )}
-            >
-              {label}
-            </button>
-          ))}
+      {/* 前注 / Special Bets */}
+      {isFortune ? (
+        <div>
+          <div className="text-[9px] text-slate-500 uppercase tracking-wide mb-1">Special Bets</div>
+          <div className="grid grid-cols-2 gap-1">
+            {([
+              { mode: "normal" as const, label: "Normal 20×" },
+              { mode: "ante1" as const, label: "Ante 1 40×" },
+              { mode: "ante2" as const, label: "Ante 2 140×" },
+              { mode: "super1" as const, label: "Super 1 200×" },
+              { mode: "super2" as const, label: "Super 2 5000×" },
+            ]).map(({ mode, label }) => (
+              <button
+                key={mode}
+                onClick={() => onFortuneBetChange?.(mode)}
+                disabled={!onFortuneBetChange || isActive || isFreeSpins || isAutoSpinning}
+                className={cn(
+                  "py-1 rounded text-xs font-medium transition-all text-left px-2 border",
+                  fortuneBetMode === mode
+                    ? "bg-blue-600/80 text-white border-blue-500/60"
+                    : "bg-slate-700/40 text-slate-400 hover:bg-slate-600/40 border-slate-700/30",
+                  (!onFortuneBetChange || isActive || isFreeSpins || isAutoSpinning) && "opacity-50 cursor-not-allowed",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="text-[9px] text-slate-600 mt-1 leading-tight">
+            Ante: FS chance ×5. Super: guarantee multipliers, FS disabled.
+          </div>
         </div>
-      </div>
+      ) : (
+        <div>
+          <div className="text-[9px] text-slate-500 uppercase tracking-wide mb-1">前注 (Ante Bet)</div>
+          <div className="space-y-1">
+            {([
+              { mode: "none" as AnteBetMode, label: "关闭" },
+              { mode: "x20" as AnteBetMode, label: "+25% 可购买FS" },
+              { mode: "x25" as AnteBetMode, label: "+25% 散落×2" },
+            ]).map(({ mode, label }) => (
+              <button
+                key={mode}
+                onClick={() => onAnteBetChange(mode)}
+                disabled={isActive || isFreeSpins || isAutoSpinning}
+                className={cn(
+                  "w-full py-1 rounded text-xs font-medium transition-all text-left px-2",
+                  anteBetMode === mode
+                    ? "bg-blue-600/80 text-white"
+                    : "bg-slate-700/40 text-slate-400 hover:bg-slate-600/40",
+                  (isActive || isFreeSpins || isAutoSpinning) && "opacity-50 cursor-not-allowed",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 旋转按钮 */}
       <button
@@ -280,28 +335,30 @@ export const GameControls: React.FC<GameControlsProps> = ({
           <div className="text-[9px] text-slate-500 uppercase tracking-wide">购买功能</div>
           <button
             onClick={() => onBuyFreeSpins(false)}
-            disabled={!canBuyFS}
+            disabled={!canBuyFS || fortuneIsSuper}
             className={cn(
               "w-full py-1.5 rounded text-xs font-medium transition-all border",
-              canBuyFS
+              canBuyFS && !fortuneIsSuper
                 ? "bg-purple-900/40 border-purple-600/50 text-purple-300 hover:bg-purple-800/40"
                 : "bg-slate-800/30 border-slate-700/30 text-slate-600 cursor-not-allowed"
             )}
           >
             购买免费旋转 <span className="font-mono text-purple-400">{buyFSCost.toFixed(0)}x</span>
           </button>
-          <button
-            onClick={() => onBuyFreeSpins(true)}
-            disabled={!canBuySFS}
-            className={cn(
-              "w-full py-1.5 rounded text-xs font-medium transition-all border",
-              canBuySFS
-                ? "bg-yellow-900/40 border-yellow-600/50 text-yellow-300 hover:bg-yellow-800/40"
-                : "bg-slate-800/30 border-slate-700/30 text-slate-600 cursor-not-allowed"
-            )}
-          >
-            购买超级FS <span className="font-mono text-yellow-400">{buySFSCost.toFixed(0)}x</span>
-          </button>
+          {(isSweet || isFortune) && (
+            <button
+              onClick={() => onBuyFreeSpins(true)}
+              disabled={!canBuySFS || fortuneIsSuper}
+              className={cn(
+                "w-full py-1.5 rounded text-xs font-medium transition-all border",
+                canBuySFS && !fortuneIsSuper
+                  ? "bg-yellow-900/40 border-yellow-600/50 text-yellow-300 hover:bg-yellow-800/40"
+                  : "bg-slate-800/30 border-slate-700/30 text-slate-600 cursor-not-allowed",
+              )}
+            >
+              购买超级FS <span className="font-mono text-yellow-400">{buySFSCost.toFixed(0)}x</span>
+            </button>
+          )}
         </div>
       )}
 

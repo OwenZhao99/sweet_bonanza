@@ -6,17 +6,21 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { GridCell, MultiplierCell, SYMBOL_MAP, GRID_COLS, GRID_ROWS } from "@/lib/gameEngine";
+import { GridCell, MultiplierCell, SYMBOL_MAP } from "@/lib/gameEngine";
 import { SYMBOL_MAP as OLYMPUS_SYMBOL_MAP } from "@/lib/gameEngineOlympus";
 import type { GridCell as OlympusGridCell, MultiplierCell as OlympusMultiplierCell } from "@/lib/gameEngineOlympus";
+import { SYMBOL_MAP as FORTUNE_SYMBOL_MAP } from "@/lib/gameEngineFortuneOlympus";
+import type { GridCell as FortuneGridCell, MultiplierCell as FortuneMultiplierCell } from "@/lib/gameEngineFortuneOlympus";
 import { cn } from "@/lib/utils";
 
-type AnyGridCell = GridCell | OlympusGridCell;
-type AnyMultiplierCell = MultiplierCell | OlympusMultiplierCell;
+type AnyGridCell = GridCell | OlympusGridCell | FortuneGridCell;
+type AnyMultiplierCell = MultiplierCell | OlympusMultiplierCell | FortuneMultiplierCell;
 
 interface GameGridProps {
   grid: AnyGridCell[];
   multipliers: AnyMultiplierCell[];
+  cols: number;
+  rows: number;
   winPositions: number[];
   currentWinSymbol: string | null;
   isSpinning: boolean;
@@ -43,6 +47,9 @@ const SYMBOL_SHAPES: Record<string, { shape: string; color: string; bg: string }
   chalice:    { shape: "🏆", color: "#22c55e", bg: "rgba(220,252,231,0.95)" },
   red:        { shape: "♦",  color: "#ef4444", bg: "rgba(254,226,226,0.95)" },
   yellow:     { shape: "⬡",  color: "#facc15", bg: "rgba(254,249,195,0.95)" },
+  // Fortune
+  lightning:  { shape: "⚡", color: "#60a5fa", bg: "rgba(219,234,254,0.95)" },
+  helmet:     { shape: "🪖", color: "#fb923c", bg: "rgba(255,237,213,0.95)" },
   // purple already exists
   // green/blue already exist
 };
@@ -53,6 +60,7 @@ interface CellProps {
   isWin: boolean;
   isScatter: boolean;
   index: number;
+  cols: number;
   isSpinning: boolean;
   isDropping: boolean;
   dropRow: number;
@@ -64,6 +72,7 @@ const Cell: React.FC<CellProps> = ({
   isWin,
   isScatter,
   index,
+  cols,
   isSpinning,
   isDropping,
   dropRow,
@@ -86,7 +95,10 @@ const Cell: React.FC<CellProps> = ({
   }
 
   const shape = SYMBOL_SHAPES[symbolId];
-  const sym = (SYMBOL_MAP as any)[symbolId] || (OLYMPUS_SYMBOL_MAP as any)[symbolId];
+  const sym =
+    (SYMBOL_MAP as any)[symbolId] ||
+    (OLYMPUS_SYMBOL_MAP as any)[symbolId] ||
+    (FORTUNE_SYMBOL_MAP as any)[symbolId];
 
   // Calculate drop distance in % of cell height (each row = 100%)
   const dropDistance = dropRow > 0 ? dropRow * 120 : 150;
@@ -106,7 +118,7 @@ const Cell: React.FC<CellProps> = ({
       )}
       style={{
         background: shape?.bg || "rgba(248,250,252,0.95)",
-        animationDelay: isDropping ? `${(index % GRID_COLS) * 40}ms` : undefined,
+        animationDelay: isDropping ? `${(index % cols) * 40}ms` : undefined,
         // CSS custom property for drop distance
         ["--drop-distance" as string]: `-${dropDistance}%`,
       }}
@@ -147,6 +159,8 @@ const Cell: React.FC<CellProps> = ({
 export const GameGrid: React.FC<GameGridProps> = ({
   grid,
   multipliers,
+  cols,
+  rows,
   winPositions,
   currentWinSymbol,
   isSpinning,
@@ -159,7 +173,7 @@ export const GameGrid: React.FC<GameGridProps> = ({
   // Calculate how many rows each dropping cell falls from
   const getDropRow = (index: number): number => {
     if (!dropSet.has(index)) return 0;
-    const row = Math.floor(index / GRID_COLS);
+    const row = Math.floor(index / cols);
     // Cells higher up in the column drop from further away
     return row + 1;
   };
@@ -185,13 +199,13 @@ export const GameGrid: React.FC<GameGridProps> = ({
       <div
         className="grid gap-0.5 flex-1 min-h-0"
         style={{
-          gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-          gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`,
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridTemplateRows: `repeat(${rows}, 1fr)`,
           alignContent: "stretch",
           overflow: "hidden",
         }}
       >
-        {Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => {
+        {Array.from({ length: rows * cols }, (_, i) => {
           const symbolId = grid[i] || null;
           const multiplier = multipliers[i] || null;
           const isWin = winSet.has(i);
@@ -207,6 +221,7 @@ export const GameGrid: React.FC<GameGridProps> = ({
               isWin={isWin}
               isScatter={isScatter}
               index={i}
+              cols={cols}
               isSpinning={isSpinning && symbolId === null}
               isDropping={isDropping}
               dropRow={dropRow}
@@ -218,9 +233,9 @@ export const GameGrid: React.FC<GameGridProps> = ({
       {/* 列标签 */}
       <div
         className="grid gap-1 mt-1"
-        style={{ gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)` }}
+        style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
       >
-        {Array.from({ length: GRID_COLS }, (_, i) => (
+        {Array.from({ length: cols }, (_, i) => (
           <div key={i} className="text-center text-[9px] text-slate-400">
             {i + 1}
           </div>

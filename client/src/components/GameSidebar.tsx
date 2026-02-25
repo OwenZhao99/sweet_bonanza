@@ -38,6 +38,16 @@ const GAME_LIST: GameEntry[] = [
     status: "active",
     category: "Cluster Pays",
   },
+  {
+    id: "fortune-of-olympus",
+    name: "Fortune of Olympus",
+    provider: "Pragmatic Play",
+    icon: "🏛️",
+    rtp: 96.55,
+    volatility: "High",
+    status: "active",
+    category: "Cluster Pays",
+  },
 ];
 
 const CATEGORIES = ["All", "Cluster Pays", "Paylines"];

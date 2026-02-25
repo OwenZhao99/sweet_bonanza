@@ -10,6 +10,7 @@ import { GameGrid } from "@/components/GameGrid";
 import { StatsPanel } from "@/components/StatsPanel";
 import { Paytable } from "@/components/Paytable";
 import { PaytableOlympus } from "@/components/PaytableOlympus";
+import { PaytableFortuneOlympus } from "@/components/PaytableFortuneOlympus";
 import { SpinInfo } from "@/components/SpinInfo";
 import { MathModelModal } from "@/components/MathModelModal";
 import { MathDocModal } from "@/components/MathDocModal";
@@ -17,12 +18,17 @@ import { GameSidebar } from "@/components/GameSidebar";
 import { cn } from "@/lib/utils";
 import { BUY_FREE_SPINS_COST, BUY_SUPER_FREE_SPINS_COST, VolatilityLevel } from "@/lib/gameEngine";
 import { BUY_FREE_SPINS_COST as OLYMPUS_BUY_FREE_SPINS_COST } from "@/lib/gameEngineOlympus";
+import {
+  BET_MULTIPLIERS as FORTUNE_BET_MULTIPLIERS,
+  BUY_FREE_SPINS_COST as FORTUNE_BUY_FREE_SPINS_COST,
+  BUY_SUPER_FREE_SPINS_COST as FORTUNE_BUY_SUPER_FREE_SPINS_COST,
+} from "@/lib/gameEngineFortuneOlympus";
 
 type RightPanel = "stats" | "paytable" | "history";
 
 
 const BET_OPTIONS = [0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
-const AUTO_SPIN_PRESETS = [10, 1000, 10000, 50000];
+const AUTO_SPIN_PRESETS = [1000, 10000, 50000, 100000];
 
 const VOLATILITY_OPTIONS: { value: VolatilityLevel; label: string; color: string; desc: string }[] = [
   { value: "low",     label: "Low",     color: "text-green-600",  desc: "Min 6 symbols, low bombs" },
@@ -57,6 +63,10 @@ function downloadCSV(records: SpinRecord[]) {
 export default function Home() {
   const [activeGameId, setActiveGameId] = useState<GameId>("sweet-bonanza-1000");
   const isSweet = activeGameId === "sweet-bonanza-1000";
+  const isOlympus = activeGameId === "gates-of-olympus-1000";
+  const isFortune = activeGameId === "fortune-of-olympus";
+  const gridCols = isFortune ? 7 : 6;
+  const gridRows = isFortune ? 7 : 5;
   const {
     state,
     startSpin,
@@ -66,6 +76,7 @@ export default function Home() {
     endFreeSpins,
     setBet,
     setAnteBetMode,
+    setFortuneBetMode,
     handleBuyFreeSpins,
     addBalance,
     resetGame,
@@ -102,6 +113,7 @@ export default function Home() {
     isFreeSpins,
     freeSpinsTotalWin,
     anteBetMode,
+    fortuneBetMode,
     stats,
     lastScatterCount,
     currentMultiplierTotal,
@@ -137,17 +149,20 @@ export default function Home() {
   const isActive = phase === "spinning" || phase === "tumbling" || phase === "bonus_trigger"
     || phase === "free_spins" || phase === "free_spins_spinning";
   const isAutoSpinning = autoSpinRemaining > 0;
-  const effectiveBet = anteBetMode !== "none" ? bet * 1.25 : bet;
+  const effectiveBet = isFortune ? bet * FORTUNE_BET_MULTIPLIERS[fortuneBetMode] : anteBetMode !== "none" ? bet * 1.25 : bet;
   const canSpin = !isActive && !isFreeSpins && !isAutoSpinning && balance >= effectiveBet;
   const canAutoSpin = !isActive && !isFreeSpins && !isAutoSpinning && balance >= effectiveBet;
-  const buyFSCost = (isSweet ? BUY_FREE_SPINS_COST : OLYMPUS_BUY_FREE_SPINS_COST) * bet;
-  const buySFSCost = BUY_SUPER_FREE_SPINS_COST * bet;
+  const buyFSCost = (isSweet ? BUY_FREE_SPINS_COST : isOlympus ? OLYMPUS_BUY_FREE_SPINS_COST : FORTUNE_BUY_FREE_SPINS_COST) * (isFortune ? effectiveBet : bet);
+  const buySFSCost = (isSweet ? BUY_SUPER_FREE_SPINS_COST : FORTUNE_BUY_SUPER_FREE_SPINS_COST) * (isFortune ? effectiveBet : bet);
+  const fortuneIsSuper = isFortune && (fortuneBetMode === "super1" || fortuneBetMode === "super2");
 
-  const gameTitle = isSweet ? "Sweet Bonanza 1000" : "Gates of Olympus 1000";
+  const gameTitle = isSweet ? "Sweet Bonanza 1000" : isOlympus ? "Gates of Olympus 1000" : "Fortune of Olympus";
   const gameLink = isSweet
     ? "https://www.pragmaticplay.com/en/games/sweet-bonanza-1000/"
-    : "https://www.pragmaticplay.com/en/games/gates-of-olympus-1000/";
-  const gameMaxWinText = isSweet ? "25,000x" : "15,000x";
+    : isOlympus
+    ? "https://www.pragmaticplay.com/en/games/gates-of-olympus-1000/"
+    : "https://www.pragmaticplay.com/en/games/fortune-of-olympus/";
+  const gameMaxWinText = isSweet ? "25,000x" : isOlympus ? "15,000x" : "10,000x";
 
   const autoSpinProgress = autoSpinTotal > 0
     ? ((autoSpinTotal - autoSpinRemaining) / autoSpinTotal) * 100
@@ -282,32 +297,76 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Ante Bet */}
-          <div>
-            <div className="text-xs text-slate-400 mb-1.5 uppercase tracking-wide">Ante Bet</div>
-            <div className="space-y-0.5">
-              {([
-                { mode: "none" as const, label: "Off" },
-                { mode: "x20" as const, label: "+25% Buy FS" },
-                { mode: "x25" as const, label: "+25% Scatter ×2" },
-              ]).map(({ mode, label }) => (
-                <button
-                  key={mode}
-                  onClick={() => setAnteBetMode(mode)}
-                  disabled={isActive || isFreeSpins || isAutoSpinning}
-                  className={cn(
-                    "w-full py-1 px-2.5 rounded text-xs font-medium transition-all text-left border",
-                    anteBetMode === mode
-                      ? "bg-blue-500 text-white border-blue-500"
-                      : "bg-slate-50 text-slate-500 hover:bg-slate-100 border-slate-200",
-                    (isActive || isFreeSpins || isAutoSpinning) && "opacity-40 cursor-not-allowed"
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
+          {/* Bet Mode */}
+          {isFortune ? (
+            <div>
+              <div className="text-xs text-slate-400 mb-1.5 uppercase tracking-wide">Special Bets</div>
+              <div className="grid grid-cols-2 gap-1">
+                {([
+                  { mode: "normal" as const, label: "Normal (20×)" },
+                  { mode: "ante1" as const, label: "Ante 1 (40×)" },
+                  { mode: "ante2" as const, label: "Ante 2 (140×)" },
+                  { mode: "super1" as const, label: "Super 1 (200×)" },
+                  { mode: "super2" as const, label: "Super 2 (5000×)" },
+                ]).map(({ mode, label }) => (
+                  <button
+                    key={mode}
+                    onClick={() => setFortuneBetMode(mode)}
+                    disabled={isActive || isFreeSpins || isAutoSpinning}
+                    className={cn(
+                      "py-1 px-2 rounded text-xs font-medium transition-all text-left border",
+                      fortuneBetMode === mode
+                        ? "bg-blue-500 text-white border-blue-500"
+                        : "bg-slate-50 text-slate-500 hover:bg-slate-100 border-slate-200",
+                      (isActive || isFreeSpins || isAutoSpinning) && "opacity-40 cursor-not-allowed",
+                    )}
+                    title={
+                      mode === "ante1"
+                        ? "FS chance ×5"
+                        : mode === "ante2"
+                        ? "FS chance ×5; Min multiplier in feature = 5×"
+                        : mode === "super1"
+                        ? "Guarantee ≥1 multiplier; FS disabled"
+                        : mode === "super2"
+                        ? "Guarantee ≥1 multiplier (min 50×); FS disabled"
+                        : "Normal play"
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-1 leading-tight">
+                Ante modes boost Free Spins chance. Super modes guarantee multipliers but disable Free Spins.
+              </div>
             </div>
-          </div>
+          ) : (
+            <div>
+              <div className="text-xs text-slate-400 mb-1.5 uppercase tracking-wide">Ante Bet</div>
+              <div className="space-y-0.5">
+                {([
+                  { mode: "none" as const, label: "Off" },
+                  { mode: "x20" as const, label: "+25% Buy FS" },
+                  { mode: "x25" as const, label: "+25% Scatter ×2" },
+                ]).map(({ mode, label }) => (
+                  <button
+                    key={mode}
+                    onClick={() => setAnteBetMode(mode)}
+                    disabled={isActive || isFreeSpins || isAutoSpinning}
+                    className={cn(
+                      "w-full py-1 px-2.5 rounded text-xs font-medium transition-all text-left border",
+                      anteBetMode === mode
+                        ? "bg-blue-500 text-white border-blue-500"
+                        : "bg-slate-50 text-slate-500 hover:bg-slate-100 border-slate-200",
+                      (isActive || isFreeSpins || isAutoSpinning) && "opacity-40 cursor-not-allowed",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Spin button */}
           <button
@@ -433,23 +492,23 @@ export default function Home() {
               <div className="text-xs text-slate-400 uppercase tracking-wide">Buy Feature</div>
               <button
                 onClick={() => handleBuyFreeSpins(false)}
-                disabled={isActive || isFreeSpins || isAutoSpinning || balance < buyFSCost}
+                disabled={isActive || isFreeSpins || isAutoSpinning || balance < buyFSCost || fortuneIsSuper}
                 className={cn(
                   "w-full py-1.5 rounded text-xs font-medium border transition-all",
-                  !isActive && !isAutoSpinning && balance >= buyFSCost
+                  !isActive && !isAutoSpinning && balance >= buyFSCost && !fortuneIsSuper
                     ? "bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100"
                     : "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
                 )}
               >
                 Buy Free Spins <span className="font-mono">{buyFSCost.toFixed(0)}×</span>
               </button>
-              {isSweet && (
+              {(isSweet || isFortune) && (
                 <button
                   onClick={() => handleBuyFreeSpins(true)}
-                  disabled={isActive || isFreeSpins || isAutoSpinning || balance < buySFSCost}
+                  disabled={isActive || isFreeSpins || isAutoSpinning || balance < buySFSCost || fortuneIsSuper}
                   className={cn(
                     "w-full py-1.5 rounded text-xs font-medium border transition-all",
-                    !isActive && !isAutoSpinning && balance >= buySFSCost
+                    !isActive && !isAutoSpinning && balance >= buySFSCost && !fortuneIsSuper
                       ? "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
                       : "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
                   )}
@@ -571,10 +630,12 @@ export default function Home() {
         {/* ---- Center Game Area ---- */}
         <div className="flex-1 flex flex-col overflow-hidden p-2 gap-1.5 bg-slate-100">
           <div className="flex-1 min-h-0 flex items-center justify-center">
-            <div className="max-w-md w-full" style={{ aspectRatio: '6/5', maxHeight: '100%' }}>
+            <div className="max-w-md w-full" style={{ aspectRatio: `${gridCols}/${gridRows}`, maxHeight: '100%' }}>
               <GameGrid
                 grid={grid}
                 multipliers={multipliers}
+                cols={gridCols}
+                rows={gridRows}
                 winPositions={winPositions}
                 currentWinSymbol={currentWinSymbol}
                 isSpinning={phase === "spinning" || phase === "tumbling"}
@@ -638,7 +699,7 @@ export default function Home() {
                   targetRtp={currentTargetRtp}
                 />
               ) : rightPanel === "paytable" ? (
-                isSweet ? <Paytable /> : <PaytableOlympus />
+                isSweet ? <Paytable /> : isOlympus ? <PaytableOlympus /> : <PaytableFortuneOlympus />
               ) : (
                 <HistoryPanel
                   records={spinHistory}

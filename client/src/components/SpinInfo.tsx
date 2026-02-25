@@ -7,6 +7,8 @@ import React from "react";
 import { TumbleStep, SYMBOL_MAP } from "@/lib/gameEngine";
 import { SYMBOL_MAP as OLYMPUS_SYMBOL_MAP } from "@/lib/gameEngineOlympus";
 import type { TumbleStep as OlympusTumbleStep } from "@/lib/gameEngineOlympus";
+import { SYMBOL_MAP as FORTUNE_SYMBOL_MAP } from "@/lib/gameEngineFortuneOlympus";
+import type { TumbleStep as FortuneTumbleStep } from "@/lib/gameEngineFortuneOlympus";
 import { GamePhase } from "@/hooks/useSlotGame";
 import { cn } from "@/lib/utils";
 
@@ -27,12 +29,14 @@ const SYMBOL_SHAPES: Record<string, { shape: string; color: string }> = {
   chalice:    { shape: "🏆", color: "#22c55e" },
   red:        { shape: "♦", color: "#ef4444" },
   yellow:     { shape: "⬡", color: "#facc15" },
+  lightning:  { shape: "⚡", color: "#60a5fa" },
+  helmet:     { shape: "🪖", color: "#fb923c" },
 };
 
 interface SpinInfoProps {
   phase: GamePhase;
   message: string;
-  currentTumbleStep: TumbleStep | OlympusTumbleStep | null;
+  currentTumbleStep: TumbleStep | OlympusTumbleStep | FortuneTumbleStep | null;
   currentTumbleIndex: number;
   spinWin: number;
   spinWinMultiplier: number;
@@ -78,7 +82,10 @@ export const SpinInfo: React.FC<SpinInfoProps> = ({
           <div className="space-y-1">
             {currentTumbleStep.wins.map((win, i) => {
               const shape = SYMBOL_SHAPES[win.symbolId];
-                  const sym = (SYMBOL_MAP as any)[win.symbolId] || (OLYMPUS_SYMBOL_MAP as any)[win.symbolId];
+              const sym =
+                (SYMBOL_MAP as any)[win.symbolId] ||
+                (OLYMPUS_SYMBOL_MAP as any)[win.symbolId] ||
+                (FORTUNE_SYMBOL_MAP as any)[win.symbolId];
               return (
                 <div
                   key={i}
