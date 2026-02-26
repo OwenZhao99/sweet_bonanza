@@ -99,6 +99,7 @@ export interface GameState {
   currentMultiplierTotal: number;
   featureMultiplierMeter: number; // Olympus FS running total multiplier
   lastFinalMultiplierSum: number; // Olympus final multiplier sum (per sequence)
+  freeSpinsMeterMode: "none" | "per_spin" | "across_spins";
   savedOlympusFsMultiplierChance: number | null;
   message: string;
   autoSpin: boolean;
@@ -154,6 +155,7 @@ function createInitialState(gameId: GameId): GameState {
     currentMultiplierTotal: 0,
     featureMultiplierMeter: 0,
     lastFinalMultiplierSum: 0,
+    freeSpinsMeterMode: "none",
     savedOlympusFsMultiplierChance: null,
     message:
       gameId === "gates-of-olympus-1000"
@@ -329,15 +331,25 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
             const olympusSpin = spinResult as OlympusFullSpinResult;
             const finalMultiplierSum = olympusSpin.finalMultiplierSum || 0;
 
+            const meterMode = stateRef.current.freeSpinsMeterMode;
             const meterBefore = stateRef.current.featureMultiplierMeter || 0;
-            const shouldApplyMeter = isFreeSpins && cumulativeWin > 0 && finalMultiplierSum > 0;
-            const meterAfter = shouldApplyMeter ? meterBefore + finalMultiplierSum : meterBefore;
+            const hasWin = cumulativeWin > 0;
 
+            let nextMeter = meterBefore;
             let finalWinMultiplier = cumulativeWin;
+
             if (!isFreeSpins) {
               finalWinMultiplier = cumulativeWin * (finalMultiplierSum > 0 ? finalMultiplierSum : 1);
+              nextMeter = 0;
+            } else if (meterMode === "across_spins") {
+              if (hasWin) nextMeter = meterBefore + finalMultiplierSum;
+              const effective = nextMeter > 0 ? nextMeter : 1;
+              finalWinMultiplier = hasWin ? cumulativeWin * effective : cumulativeWin;
             } else {
-              finalWinMultiplier = shouldApplyMeter ? cumulativeWin * meterAfter : cumulativeWin;
+              // per_spin (reset each spin)
+              const spinMult = finalMultiplierSum > 0 ? finalMultiplierSum : 1;
+              finalWinMultiplier = hasWin ? cumulativeWin * spinMult : cumulativeWin;
+              nextMeter = 0;
             }
 
             // Max win cap (Olympus): 15,000x
@@ -371,8 +383,6 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                 newRemaining = 0;
               }
 
-              const nextMeter = shouldApplyMeter ? meterAfter : meterBefore;
-
               if (newRemaining <= 0) {
                 updateState((prev) => ({
                   ...prev,
@@ -389,8 +399,8 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                   spinWin: totalWin,
                   spinWinMultiplier: finalWinMultiplier,
                   stats: newStats,
-                  featureMultiplierMeter: nextMeter,
-                  currentMultiplierTotal: nextMeter,
+                  featureMultiplierMeter: meterMode === "across_spins" ? nextMeter : 0,
+                  currentMultiplierTotal: meterMode === "across_spins" ? nextMeter : finalMultiplierSum,
                   lastFinalMultiplierSum: finalMultiplierSum,
                   message: `Free Spins ended! Total win: ${newTotalWin.toFixed(2)}`,
                 }));
@@ -412,8 +422,8 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                   spinWin: totalWin,
                   spinWinMultiplier: finalWinMultiplier,
                   stats: newStats,
-                  featureMultiplierMeter: nextMeter,
-                  currentMultiplierTotal: nextMeter,
+                  featureMultiplierMeter: meterMode === "across_spins" ? nextMeter : 0,
+                  currentMultiplierTotal: meterMode === "across_spins" ? nextMeter : finalMultiplierSum,
                   lastFinalMultiplierSum: finalMultiplierSum,
                   message: retriggerMsg,
                 }));
@@ -480,15 +490,24 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
             const fortuneSpin = spinResult as FortuneFullSpinResult;
             const finalMultiplierSum = fortuneSpin.finalMultiplierSum || 0;
 
+            const meterMode = stateRef.current.freeSpinsMeterMode;
             const meterBefore = stateRef.current.featureMultiplierMeter || 0;
-            const shouldApplyMeter = isFreeSpins && cumulativeWin > 0 && finalMultiplierSum > 0;
-            const meterAfter = shouldApplyMeter ? meterBefore + finalMultiplierSum : meterBefore;
+            const hasWin = cumulativeWin > 0;
 
+            let nextMeter = meterBefore;
             let finalWinMultiplier = cumulativeWin;
+
             if (!isFreeSpins) {
               finalWinMultiplier = cumulativeWin * (finalMultiplierSum > 0 ? finalMultiplierSum : 1);
+              nextMeter = 0;
+            } else if (meterMode === "across_spins") {
+              if (hasWin) nextMeter = meterBefore + finalMultiplierSum;
+              const effective = nextMeter > 0 ? nextMeter : 1;
+              finalWinMultiplier = hasWin ? cumulativeWin * effective : cumulativeWin;
             } else {
-              finalWinMultiplier = shouldApplyMeter ? cumulativeWin * meterAfter : cumulativeWin;
+              const spinMult = finalMultiplierSum > 0 ? finalMultiplierSum : 1;
+              finalWinMultiplier = hasWin ? cumulativeWin * spinMult : cumulativeWin;
+              nextMeter = 0;
             }
 
             if (!isFreeSpins && finalWinMultiplier > Fortune.MAX_WIN_MULTIPLIER) {
@@ -521,8 +540,6 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                 newRemaining = 0;
               }
 
-              const nextMeter = shouldApplyMeter ? meterAfter : meterBefore;
-
               if (newRemaining <= 0) {
                 updateState((prev) => ({
                   ...prev,
@@ -538,8 +555,8 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                   spinWin: totalWin,
                   spinWinMultiplier: finalWinMultiplier,
                   stats: newStats,
-                  featureMultiplierMeter: nextMeter,
-                  currentMultiplierTotal: nextMeter,
+                  featureMultiplierMeter: meterMode === "across_spins" ? nextMeter : 0,
+                  currentMultiplierTotal: meterMode === "across_spins" ? nextMeter : finalMultiplierSum,
                   lastFinalMultiplierSum: finalMultiplierSum,
                   message: `Free Spins ended! Total win: ${newTotalWin.toFixed(2)}`,
                 }));
@@ -561,8 +578,8 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                   spinWin: totalWin,
                   spinWinMultiplier: finalWinMultiplier,
                   stats: newStats,
-                  featureMultiplierMeter: nextMeter,
-                  currentMultiplierTotal: nextMeter,
+                  featureMultiplierMeter: meterMode === "across_spins" ? nextMeter : 0,
+                  currentMultiplierTotal: meterMode === "across_spins" ? nextMeter : finalMultiplierSum,
                   lastFinalMultiplierSum: finalMultiplierSum,
                   message: retriggerMsg,
                 }));
@@ -631,12 +648,32 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
           }
 
           // === Sweet settlement ===
-          // In free spins, apply final multiplier at end of tumble sequence
-          if (isFreeSpins && steps.length > 0) {
-            const finalMultiplierTotal = (steps[steps.length - 1] as SweetTumbleStep).multiplierTotal;
-            if (finalMultiplierTotal > 0) {
-              cumulativeWin *= finalMultiplierTotal;
+          const meterMode = stateRef.current.freeSpinsMeterMode;
+          const meterBefore = stateRef.current.featureMultiplierMeter || 0;
+          const hasWin = cumulativeWin > 0;
+          let nextMeter = meterBefore;
+          let displayMultiplierTotal = 0;
+
+          // In free spins, apply multiplier at end of tumble sequence.
+          // - per_spin: use this spin's multiplier sum, then reset
+          // - across_spins (Buy FS): accumulate across spins and use meter even if this spin has no new multipliers
+          if (isFreeSpins && steps.length > 0 && hasWin) {
+            const spinMultiplierSum = (steps[steps.length - 1] as SweetTumbleStep).multiplierTotal || 0;
+            if (meterMode === "across_spins") {
+              nextMeter = meterBefore + spinMultiplierSum;
+              const effective = nextMeter > 0 ? nextMeter : 1;
+              cumulativeWin *= effective;
+              displayMultiplierTotal = nextMeter;
+            } else {
+              const effective = spinMultiplierSum > 0 ? spinMultiplierSum : 1;
+              cumulativeWin *= effective;
+              nextMeter = 0;
+              displayMultiplierTotal = spinMultiplierSum;
             }
+          } else if (isFreeSpins) {
+            // No win on this spin: meter persists only for across_spins mode
+            nextMeter = meterMode === "across_spins" ? meterBefore : 0;
+            displayMultiplierTotal = meterMode === "across_spins" ? meterBefore : 0;
           }
           const totalWin = cumulativeWin * betAmount;
           // In free spins, don't count bet or spins (already counted in the triggering spin)
@@ -693,6 +730,8 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                 spinWin: totalWin,
                 spinWinMultiplier: cumulativeWin,
                 stats: newStats,
+                featureMultiplierMeter: meterMode === "across_spins" ? nextMeter : 0,
+                currentMultiplierTotal: meterMode === "across_spins" ? nextMeter : displayMultiplierTotal,
                 message: `Free Spins ended! Total win: ${newTotalWin.toFixed(2)}`,
               }));
             } else {
@@ -713,6 +752,8 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                 spinWin: totalWin,
                 spinWinMultiplier: cumulativeWin,
                 stats: newStats,
+                featureMultiplierMeter: meterMode === "across_spins" ? nextMeter : 0,
+                currentMultiplierTotal: meterMode === "across_spins" ? nextMeter : displayMultiplierTotal,
                 message: retriggerMsg,
               }));
               timerRef.current = setTimeout(() => {
@@ -1041,6 +1082,7 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                 freeSpinsTotalWin: 0,
                 featureMultiplierMeter: 0,
                 currentMultiplierTotal: 0,
+                freeSpinsMeterMode: "per_spin",
                 message: `Free Spins started! ${Olympus.FREE_SPINS_BASE} spins`,
               }));
 
@@ -1118,6 +1160,7 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                 freeSpinsTotalWin: 0,
                 featureMultiplierMeter: 0,
                 currentMultiplierTotal: 0,
+                freeSpinsMeterMode: "per_spin",
                 fortuneFeatureMinMultiplierValue: featureMin,
                 message: `Free Spins started! ${fsBase} spins`,
               }));
@@ -1207,6 +1250,9 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
               freeSpinsTotal: FREE_SPINS_BASE,
               freeSpinsTotalWin: scatterPayout + initialTumbleWinAmount,
               balance: prev.balance + scatterPayout,
+              featureMultiplierMeter: 0,
+              currentMultiplierTotal: 0,
+              freeSpinsMeterMode: "per_spin",
               message: `Free Spins started! ${FREE_SPINS_BASE} spins`,
             }));
 
@@ -1352,8 +1398,9 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
         freeSpinsTotalWin: activeIsOlympus || activeIsFortune ? 0 : scatterPayoutAmount,
         // Olympus/Fortune credit FS at round end; Sweet credits immediately.
         balance: activeIsOlympus || activeIsFortune ? prev.balance : prev.balance + scatterPayoutAmount,
-        featureMultiplierMeter: activeIsOlympus || activeIsFortune ? 0 : prev.featureMultiplierMeter,
-        currentMultiplierTotal: activeIsOlympus || activeIsFortune ? 0 : prev.currentMultiplierTotal,
+        featureMultiplierMeter: 0,
+        currentMultiplierTotal: 0,
+        freeSpinsMeterMode: "per_spin",
         message: `Free Spins started! ${
           activeIsOlympus
             ? Olympus.FREE_SPINS_BASE
@@ -1418,8 +1465,9 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
           : FREE_SPINS_BASE,
         // Olympus buy feature guarantees 4 scatters (3x payout) on trigger; credit at round end.
         freeSpinsTotalWin: activeIsOlympus ? 3 * current.bet : 0,
-        featureMultiplierMeter: activeIsOlympus ? 0 : prev.featureMultiplierMeter,
-        currentMultiplierTotal: activeIsOlympus ? 0 : prev.currentMultiplierTotal,
+        featureMultiplierMeter: 0,
+        currentMultiplierTotal: 0,
+        freeSpinsMeterMode: "across_spins",
         fortuneFeatureMinMultiplierValue: activeIsFortune ? fortuneFeatureMin : prev.fortuneFeatureMinMultiplierValue,
         message: activeIsOlympus
           ? "Bought Free Spins!"
@@ -1451,8 +1499,9 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
         isSuperFreeSpins: false,
         freeSpinsRemaining: 0,
         freeSpinsTotal: 0,
-        featureMultiplierMeter: activeIsOlympus || activeIsFortune ? 0 : prev.featureMultiplierMeter,
-        currentMultiplierTotal: activeIsOlympus || activeIsFortune ? 0 : prev.currentMultiplierTotal,
+        featureMultiplierMeter: 0,
+        currentMultiplierTotal: 0,
+        freeSpinsMeterMode: "none",
         savedOlympusFsMultiplierChance: activeIsOlympus ? null : prev.savedOlympusFsMultiplierChance,
         message: `Free Spins ended! Total win: ${prev.freeSpinsTotalWin.toFixed(2)}`,
       };

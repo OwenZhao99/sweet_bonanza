@@ -393,16 +393,30 @@ function ensureAtLeastOneMultiplier(multipliers: MultiplierCell[], minValue: num
   return next;
 }
 
+function applyMultiplierOccupancy(grid: GridCell[], multipliers: MultiplierCell[]): GridCell[] {
+  const next = [...grid];
+  for (let i = 0; i < GRID_SIZE; i++) {
+    if (multipliers[i] !== null) next[i] = null;
+  }
+  return next;
+}
+
 // ============================================================
 // Grid generation
 // ============================================================
 
 export function generateGrid(betMode: FortuneBetMode): { grid: GridCell[]; multipliers: MultiplierCell[] } {
-  const grid: GridCell[] = [];
+  let grid: GridCell[] = [];
   let multipliers: MultiplierCell[] = [];
   for (let i = 0; i < GRID_SIZE; i++) {
-    grid.push(randomSymbol(betMode, false));
-    multipliers.push(maybeSpawnMultiplier(false, 2));
+    const mult = maybeSpawnMultiplier(false, 2);
+    if (mult !== null) {
+      grid.push(null);
+      multipliers.push(mult);
+    } else {
+      grid.push(randomSymbol(betMode, false));
+      multipliers.push(null);
+    }
   }
 
   if (betMode === "super1") {
@@ -412,6 +426,7 @@ export function generateGrid(betMode: FortuneBetMode): { grid: GridCell[]; multi
     multipliers = ensureAtLeastOneMultiplier(multipliers, 50);
   }
 
+  grid = applyMultiplierOccupancy(grid, multipliers);
   return { grid, multipliers };
 }
 
@@ -419,8 +434,14 @@ export function generateFreeSpinsGrid(minMultiplierValue: number): { grid: GridC
   const grid: GridCell[] = [];
   const multipliers: MultiplierCell[] = [];
   for (let i = 0; i < GRID_SIZE; i++) {
-    grid.push(randomSymbol("normal", true));
-    multipliers.push(maybeSpawnMultiplier(true, minMultiplierValue));
+    const mult = maybeSpawnMultiplier(true, minMultiplierValue);
+    if (mult !== null) {
+      grid.push(null);
+      multipliers.push(mult);
+    } else {
+      grid.push(randomSymbol("normal", true));
+      multipliers.push(null);
+    }
   }
   return { grid, multipliers };
 }
@@ -550,32 +571,46 @@ export function tumble(
 
   for (const pos of winPositions) {
     newGrid[pos] = null;
-    newMultipliers[pos] = null;
   }
 
   for (let col = 0; col < GRID_COLS; col++) {
-    const existing: GridCell[] = [];
-    const existingMult: MultiplierCell[] = [];
+    const entities: ({ kind: "mult"; mult: MultiplierCell } | { kind: "sym"; sym: FortuneSymbolId })[] = [];
 
     for (let row = GRID_ROWS - 1; row >= 0; row--) {
       const idx = row * GRID_COLS + col;
-      if (newGrid[idx] !== null) {
-        existing.push(newGrid[idx]);
-        existingMult.push(newMultipliers[idx]);
+      const mult = newMultipliers[idx];
+      const sym = newGrid[idx];
+      if (mult !== null) {
+        entities.push({ kind: "mult", mult });
+      } else if (sym !== null) {
+        entities.push({ kind: "sym", sym });
       }
     }
 
-    const emptyCount = GRID_ROWS - existing.length;
+    const emptyCount = GRID_ROWS - entities.length;
     for (let i = 0; i < emptyCount; i++) {
-      existing.push(randomSymbol("normal", isFreeSpins));
-      existingMult.push(maybeSpawnMultiplier(isFreeSpins, minMultiplierValue));
+      const mult = maybeSpawnMultiplier(isFreeSpins, minMultiplierValue);
+      if (mult !== null) {
+        entities.push({ kind: "mult", mult });
+      } else {
+        entities.push({ kind: "sym", sym: randomSymbol("normal", isFreeSpins) });
+      }
     }
 
     for (let row = GRID_ROWS - 1; row >= 0; row--) {
       const idx = row * GRID_COLS + col;
       const symIdx = GRID_ROWS - 1 - row;
-      newGrid[idx] = existing[symIdx] || null;
-      newMultipliers[idx] = existingMult[symIdx] || null;
+      const ent = entities[symIdx];
+      if (!ent) {
+        newGrid[idx] = null;
+        newMultipliers[idx] = null;
+      } else if (ent.kind === "mult") {
+        newGrid[idx] = null;
+        newMultipliers[idx] = ent.mult;
+      } else {
+        newGrid[idx] = ent.sym;
+        newMultipliers[idx] = null;
+      }
     }
 
     for (let i = 0; i < emptyCount; i++) {
@@ -688,6 +723,7 @@ export function spin(
   if (!isFreeSpins && betMode === "super2") {
     finalMultipliers = ensureAtLeastOneMultiplier(finalMultipliers, 50);
   }
+  finalGrid = applyMultiplierOccupancy(finalGrid, finalMultipliers);
 
   // Buy trigger spins should never directly start FS from this function; UI/hook handles it.
   // But we keep triggersBonus consistent with normal base play rules.
@@ -733,6 +769,7 @@ export function buyFreeSpinsTriggerGrid(
       while (forced.size < forcedCount) forced.add(Math.floor(Math.random() * GRID_SIZE));
       Array.from(forced).forEach((pos) => {
         grid[pos] = "scatter";
+        multipliers[pos] = null;
       });
       return { grid, multipliers, scatterCount: forcedCount };
     }

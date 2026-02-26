@@ -241,8 +241,14 @@ export function generateGrid(anteBet25x = false): { grid: GridCell[]; multiplier
   const grid: GridCell[] = [];
   const multipliers: MultiplierCell[] = [];
   for (let i = 0; i < GRID_SIZE; i++) {
-    grid.push(randomSymbol(anteBet25x));
-    multipliers.push(maybeSpawnMultiplier(false));
+    const mult = maybeSpawnMultiplier(false);
+    if (mult !== null) {
+      grid.push(null);
+      multipliers.push(mult);
+    } else {
+      grid.push(randomSymbol(anteBet25x));
+      multipliers.push(null);
+    }
   }
   return { grid, multipliers };
 }
@@ -251,8 +257,14 @@ export function generateFreeSpinsGrid(): { grid: GridCell[]; multipliers: Multip
   const grid: GridCell[] = [];
   const multipliers: MultiplierCell[] = [];
   for (let i = 0; i < GRID_SIZE; i++) {
-    grid.push(randomSymbol(false));
-    multipliers.push(maybeSpawnMultiplier(true));
+    const mult = maybeSpawnMultiplier(true);
+    if (mult !== null) {
+      grid.push(null);
+      multipliers.push(mult);
+    } else {
+      grid.push(randomSymbol(false));
+      multipliers.push(null);
+    }
   }
   return { grid, multipliers };
 }
@@ -353,32 +365,46 @@ export function tumble(
 
   for (const pos of winPositions) {
     newGrid[pos] = null;
-    newMultipliers[pos] = null;
   }
 
   for (let col = 0; col < GRID_COLS; col++) {
-    const existing: GridCell[] = [];
-    const existingMult: MultiplierCell[] = [];
+    const entities: ({ kind: "mult"; mult: MultiplierCell } | { kind: "sym"; sym: OlympusSymbolId })[] = [];
 
     for (let row = GRID_ROWS - 1; row >= 0; row--) {
       const idx = row * GRID_COLS + col;
-      if (newGrid[idx] !== null) {
-        existing.push(newGrid[idx]);
-        existingMult.push(newMultipliers[idx]);
+      const mult = newMultipliers[idx];
+      const sym = newGrid[idx];
+      if (mult !== null) {
+        entities.push({ kind: "mult", mult });
+      } else if (sym !== null) {
+        entities.push({ kind: "sym", sym });
       }
     }
 
-    const emptyCount = GRID_ROWS - existing.length;
+    const emptyCount = GRID_ROWS - entities.length;
     for (let i = 0; i < emptyCount; i++) {
-      existing.push(randomSymbol(anteBet25x));
-      existingMult.push(maybeSpawnMultiplier(isFreeSpins));
+      const mult = maybeSpawnMultiplier(isFreeSpins);
+      if (mult !== null) {
+        entities.push({ kind: "mult", mult });
+      } else {
+        entities.push({ kind: "sym", sym: randomSymbol(anteBet25x) });
+      }
     }
 
     for (let row = GRID_ROWS - 1; row >= 0; row--) {
       const idx = row * GRID_COLS + col;
       const symIdx = GRID_ROWS - 1 - row;
-      newGrid[idx] = existing[symIdx] || null;
-      newMultipliers[idx] = existingMult[symIdx] || null;
+      const ent = entities[symIdx];
+      if (!ent) {
+        newGrid[idx] = null;
+        newMultipliers[idx] = null;
+      } else if (ent.kind === "mult") {
+        newGrid[idx] = null;
+        newMultipliers[idx] = ent.mult;
+      } else {
+        newGrid[idx] = ent.sym;
+        newMultipliers[idx] = null;
+      }
     }
 
     for (let i = 0; i < emptyCount; i++) {
@@ -506,6 +532,7 @@ export function buyFreeSpinsTriggerGrid(anteBet25x = false): { grid: GridCell[];
       while (forced.size < 4) forced.add(Math.floor(Math.random() * GRID_SIZE));
       Array.from(forced).forEach((pos) => {
         grid[pos] = "scatter";
+        multipliers[pos] = null;
       });
       return { grid, multipliers };
     }

@@ -86,7 +86,9 @@ const Cell: React.FC<CellProps> = ({
     }
   }, [isDropping]);
 
-  if (symbolId === null) {
+  const hasMultiplier = multiplier !== null;
+
+  if (symbolId === null && !hasMultiplier) {
     return (
       <div className="rounded border border-slate-200 bg-slate-50 flex items-center justify-center transition-opacity duration-300 opacity-30">
         <div className="w-2 h-2 rounded-full bg-slate-300" />
@@ -94,11 +96,12 @@ const Cell: React.FC<CellProps> = ({
     );
   }
 
-  const shape = SYMBOL_SHAPES[symbolId];
-  const sym =
-    (SYMBOL_MAP as any)[symbolId] ||
-    (OLYMPUS_SYMBOL_MAP as any)[symbolId] ||
-    (FORTUNE_SYMBOL_MAP as any)[symbolId];
+  const shape = symbolId ? SYMBOL_SHAPES[symbolId] : undefined;
+  const sym = symbolId
+    ? (SYMBOL_MAP as any)[symbolId] ||
+      (OLYMPUS_SYMBOL_MAP as any)[symbolId] ||
+      (FORTUNE_SYMBOL_MAP as any)[symbolId]
+    : null;
 
   // Calculate drop distance in % of cell height (each row = 100%)
   const dropDistance = dropRow > 0 ? dropRow * 120 : 150;
@@ -117,32 +120,35 @@ const Cell: React.FC<CellProps> = ({
         isDropping ? "animate-drop" : "transition-all duration-200",
       )}
       style={{
-        background: shape?.bg || "rgba(248,250,252,0.95)",
+        background: hasMultiplier ? "rgba(120,53,15,0.10)" : shape?.bg || "rgba(248,250,252,0.95)",
         animationDelay: isDropping ? `${(index % cols) * 40}ms` : undefined,
         // CSS custom property for drop distance
         ["--drop-distance" as string]: `-${dropDistance}%`,
       }}
     >
-      {/* 符号图形 */}
-      <span
-        className="text-3xl leading-none select-none"
-        style={{ color: shape?.color || "#64748b" }}
-      >
-        {shape?.shape || "?"}
-      </span>
+      {!hasMultiplier && (
+        <>
+          {/* 符号图形 */}
+          <span
+            className="text-3xl leading-none select-none"
+            style={{ color: shape?.color || "#64748b" }}
+          >
+            {shape?.shape || "?"}
+          </span>
 
-      {/* 符号名称（小字） */}
-      <span className="text-[10px] font-medium text-slate-600 mt-0.5 leading-none">
-        {sym?.name || symbolId}
-      </span>
+          {/* 符号名称（小字） */}
+          <span className="text-[10px] font-medium text-slate-600 mt-0.5 leading-none">
+            {sym?.name || symbolId}
+          </span>
+        </>
+      )}
 
-      {/* 乘数炸弹覆盖层 */}
-      {multiplier !== null && (
+      {hasMultiplier && (
         <div className="absolute inset-0 flex items-center justify-center bg-amber-900/70 rounded">
           <div className="flex flex-col items-center">
             <span className="text-xl">💣</span>
             <span className="text-yellow-200 font-bold text-sm leading-none">
-              {multiplier.value}x
+              {multiplier!.value}x
             </span>
           </div>
         </div>

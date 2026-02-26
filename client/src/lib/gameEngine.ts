@@ -275,6 +275,8 @@ export function generateFreeSpinsGrid(
   }
   Array.from(positionsSet).forEach((pos) => {
     multipliers[pos] = { value: randomMultiplierValue(superFreeSpins) };
+    // Multiplier occupies the cell (not a regular symbol)
+    grid[pos] = null;
   });
 
   return { grid, multipliers };
@@ -487,33 +489,42 @@ export function tumble(
   const bombChance = getMultiplierBombChance();
 
   for (let col = 0; col < GRID_COLS; col++) {
-    const existing: GridCell[] = [];
-    const existingMultipliers: MultiplierCell[] = [];
+    const entities: ({ kind: "mult"; mult: MultiplierCell } | { kind: "sym"; sym: SymbolId })[] = [];
     for (let row = GRID_ROWS - 1; row >= 0; row--) {
       const idx = row * GRID_COLS + col;
-      if (newGrid[idx] !== null) {
-        existing.push(newGrid[idx]);
-        existingMultipliers.push(newMultipliers[idx]);
+      const mult = newMultipliers[idx];
+      const sym = newGrid[idx];
+      if (mult !== null) {
+        entities.push({ kind: "mult", mult });
+      } else if (sym !== null) {
+        entities.push({ kind: "sym", sym });
       }
     }
 
-    const emptyCount = GRID_ROWS - existing.length;
+    const emptyCount = GRID_ROWS - entities.length;
 
     for (let i = 0; i < emptyCount; i++) {
-      const newSym = randomSymbol(false, isFreeSpins);
-      existing.push(newSym);
       if (isFreeSpins && Math.random() < bombChance) {
-        existingMultipliers.push({ value: randomMultiplierValue(superFreeSpins) });
+        entities.push({ kind: "mult", mult: { value: randomMultiplierValue(superFreeSpins) } });
       } else {
-        existingMultipliers.push(null);
+        entities.push({ kind: "sym", sym: randomSymbol(false, isFreeSpins) });
       }
     }
 
     for (let row = GRID_ROWS - 1; row >= 0; row--) {
       const idx = row * GRID_COLS + col;
       const symIdx = GRID_ROWS - 1 - row;
-      newGrid[idx] = existing[symIdx] || null;
-      newMultipliers[idx] = existingMultipliers[symIdx] || null;
+      const ent = entities[symIdx];
+      if (!ent) {
+        newGrid[idx] = null;
+        newMultipliers[idx] = null;
+      } else if (ent.kind === "mult") {
+        newGrid[idx] = null;
+        newMultipliers[idx] = ent.mult;
+      } else {
+        newGrid[idx] = ent.sym;
+        newMultipliers[idx] = null;
+      }
     }
 
     // Track which positions were newly filled (top rows that were empty)
@@ -701,6 +712,8 @@ function generateFreeSpinsGridWithRange(
   }
   Array.from(positionsSet).forEach((pos) => {
     multipliers[pos] = { value: randomMultiplierValue(superFreeSpins) };
+    // Multiplier occupies the cell (not a regular symbol)
+    grid[pos] = null;
   });
 
   return { grid, multipliers };
