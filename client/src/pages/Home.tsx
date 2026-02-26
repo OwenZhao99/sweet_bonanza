@@ -15,6 +15,7 @@ import { SpinInfo } from "@/components/SpinInfo";
 import { MathModelModal } from "@/components/MathModelModal";
 import { MathDocModal } from "@/components/MathDocModal";
 import { GameSidebar } from "@/components/GameSidebar";
+import { GameRulesRtpPanel } from "@/components/GameRulesRtpPanel";
 import { cn } from "@/lib/utils";
 import { BUY_FREE_SPINS_COST, BUY_SUPER_FREE_SPINS_COST, VolatilityLevel } from "@/lib/gameEngine";
 import { BUY_FREE_SPINS_COST as OLYMPUS_BUY_FREE_SPINS_COST } from "@/lib/gameEngineOlympus";
@@ -24,7 +25,7 @@ import {
   BUY_SUPER_FREE_SPINS_COST as FORTUNE_BUY_SUPER_FREE_SPINS_COST,
 } from "@/lib/gameEngineFortuneOlympus";
 
-type RightPanel = "stats" | "paytable" | "history";
+type RightPanel = "stats" | "paytable" | "rulesRtp" | "history";
 
 
 const BET_OPTIONS = [0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
@@ -668,6 +669,7 @@ export default function Home() {
             {([
               { key: "stats" as const, label: "📊 Stats" },
               { key: "paytable" as const, label: "📋 Paytable" },
+              { key: "rulesRtp" as const, label: "ℹ Rules & RTP" },
               { key: "history" as const, label: "📜 History" },
             ]).map(({ key, label }) => (
               <button
@@ -687,7 +689,7 @@ export default function Home() {
 
           <div className="flex-1 overflow-y-auto p-3 flex flex-col">
             <div className="flex-1">
-              {rightPanel === "stats" ? (
+              {rightPanel === "stats" && (
                 <StatsPanel
                   stats={stats}
                   currentMultiplierTotal={currentMultiplierTotal}
@@ -698,9 +700,20 @@ export default function Home() {
                   bet={bet}
                   targetRtp={currentTargetRtp}
                 />
-              ) : rightPanel === "paytable" ? (
+              )}
+              {rightPanel === "paytable" && (
                 isSweet ? <Paytable /> : isOlympus ? <PaytableOlympus /> : <PaytableFortuneOlympus />
-              ) : (
+              )}
+              {rightPanel === "rulesRtp" && (
+                <GameRulesRtpPanel
+                  gameId={activeGameId}
+                  targetRtp={currentTargetRtp}
+                  actualRtp={stats.realRTP}
+                  baseBet={bet}
+                  effectiveBet={effectiveBet}
+                />
+              )}
+              {rightPanel === "history" && (
                 <HistoryPanel
                   records={spinHistory}
                   onClear={clearHistory}

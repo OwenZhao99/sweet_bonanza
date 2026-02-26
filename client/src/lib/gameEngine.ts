@@ -720,27 +720,22 @@ function generateFreeSpinsGridWithRange(
 }
 
 export function buyFreeSpins(superFreeSpins: boolean = false): GridCell[] {
-  let grid: GridCell[];
-  let attempts = 0;
-
-  do {
-    grid = generateGrid(false);
+  // For the Buy Free Spins feature, GLI-19 requires that outcomes are
+  // driven directly by RNG and not "forced" after the fact.
+  // We therefore sample grids until RNG naturally produces a spin
+  // that meets the documented condition (≥ SCATTER_TRIGGER scatters).
+  // This is equivalent to drawing from the conditional distribution
+  // "given that the spin triggers Free Spins", without altering
+  // individual outcomes once selected.
+  // (The superFreeSpins flag is handled by the caller via bet/feature logic.)
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const grid = generateGrid(false);
     const result = calculateWins(grid);
-    attempts++;
-    if (result.scatterCount >= SCATTER_TRIGGER) break;
-    if (attempts > 100) {
-      const forcedPositions = new Set<number>();
-      while (forcedPositions.size < 4) {
-        forcedPositions.add(Math.floor(Math.random() * GRID_SIZE));
-      }
-      Array.from(forcedPositions).forEach((pos) => {
-        grid[pos] = "scatter";
-      });
-      break;
+    if (result.scatterCount >= SCATTER_TRIGGER) {
+      return grid;
     }
-  } while (true);
-
-  return grid;
+  }
 }
 
 // ============================================================

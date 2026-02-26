@@ -1,6 +1,6 @@
 /**
  * Fortune of Olympus - Paytable & Rules
- * 展示官方规则参数（按规则图口径：payout = 表值 × bet）。
+ * Shows official-style parameters (payout values are expressed as “table value × base bet”).
  */
 
 import React, { useMemo, useState } from "react";
@@ -48,9 +48,13 @@ export const PaytableFortuneOlympus: React.FC = () => {
         {activeTab === "paytable" && (
           <div className="space-y-3">
             <p className="text-xs text-slate-500">
-              符号采用「连块支付」：同一符号 <span className="font-semibold text-slate-700">横/竖相连 ≥ 5</span>{" "}
-              即中奖。规则页数值以 <span className="font-semibold">coin win</span> 展示，实际赢分会再乘以{" "}
-              <span className="font-semibold">Base Bet</span>（总下注 = Base Bet × Bet Multiplier）。
+              Symbols use a{" "}
+              <span className="font-semibold text-slate-700">cluster pays</span> mechanic: any group of{" "}
+              <span className="font-semibold text-slate-700">5 or more</span> matching symbols
+              connected horizontally or vertically forms a win. Help‑screen values are expressed as{" "}
+              <span className="font-semibold">coin wins</span>; actual cash win in this model is
+              table value × <span className="font-semibold">Base Bet</span> (total bet = Base Bet ×
+              Bet Multiplier).
             </p>
 
             <div className="grid grid-cols-1 gap-2">
@@ -97,7 +101,9 @@ export const PaytableFortuneOlympus: React.FC = () => {
             </div>
 
             <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
-              <span className="font-bold">🧙 Scatter：</span> 任意位置出现 4–7 个 Scatter 触发免费旋转（规则图未给 Scatter 固定赔付表）。
+              <span className="font-bold">🧙 Scatter:</span> 4–7 Scatters anywhere on the grid trigger
+              the Free Spins feature (the original help screen does not specify a fixed scatter
+              paytable for this game).
             </div>
           </div>
         )}
@@ -105,16 +111,22 @@ export const PaytableFortuneOlympus: React.FC = () => {
         {activeTab === "rules" && (
           <div className="space-y-3 text-sm text-slate-600">
             <div className="bg-slate-50 rounded p-2 space-y-1 border border-slate-200">
-              <h4 className="text-emerald-600 font-bold text-sm">基本规则</h4>
-              <p>• 7 × 7 网格。</p>
-              <p>• 连块支付：横/竖相连 ≥ 5 即中奖。</p>
-              <p>• 每次结算后进入 tumble：中奖符号消失，上方下落并补新符号，直到没有新连块。</p>
+              <h4 className="text-emerald-600 font-bold text-sm">Basic rules</h4>
+              <p>• 7 × 7 grid.</p>
+              <p>• Cluster pays: 5+ symbols connected horizontally/vertically form a winning cluster.</p>
+              <p>
+                • After each evaluation, winning clusters are removed and symbols tumble: symbols above
+                fall down and new symbols are spawned from the top until no new clusters form.
+              </p>
             </div>
 
             <div className="bg-slate-50 rounded p-2 space-y-1 border border-slate-200">
-              <h4 className="text-amber-600 font-bold text-sm">倍数符号（Multiplier）</h4>
-              <p>• 倍数符号可在基础与免费旋转中随机出现，并可在 tumbles 中出现。</p>
-              <p>• 序列结束时，屏幕上所有倍数值相加，整轮赢分 × 该合计倍数。</p>
+              <h4 className="text-amber-600 font-bold text-sm">Multiplier symbols</h4>
+              <p>• Multiplier symbols can appear in both base game and free spins, including during tumbles.</p>
+              <p>
+                • When the tumble sequence for a spin ends, all multiplier values on the grid are added
+                together and the total win for the spin is multiplied by that sum.
+              </p>
               <div className="flex flex-wrap gap-1 mt-1">
                 {MULTIPLIER_VALUES.map((v) => (
                   <span
@@ -133,21 +145,32 @@ export const PaytableFortuneOlympus: React.FC = () => {
             </div>
 
             <div className="bg-slate-50 rounded p-2 space-y-1 border border-slate-200">
-              <h4 className="text-purple-600 font-bold text-sm">免费旋转（Free Spins）</h4>
-              <p>• 触发：4/5/6/7 Scatter → {freeSpinsForScatterCount(4)}/{freeSpinsForScatterCount(5)}/{freeSpinsForScatterCount(6)}/{freeSpinsForScatterCount(7)} 次免费旋转。</p>
-              <p>• 免费局中再次出现 4–7 Scatter 可再次追加相同档位的免费旋转。</p>
-              <p>• 免费局倍数为“累计总倍数”，新倍数命中会加入累计值并用于乘当前与后续赢分。</p>
+              <h4 className="text-purple-600 font-bold text-sm">Free spins</h4>
+              <p>
+                • Trigger: 4/5/6/7 Scatters award{" "}
+                {freeSpinsForScatterCount(4)}/{freeSpinsForScatterCount(5)}/
+                {freeSpinsForScatterCount(6)}/{freeSpinsForScatterCount(7)} free spins respectively.
+              </p>
+              <p>• Additional 4–7 Scatters during the feature retrigger the same tier of free spins.</p>
+              <p>
+                • Free spins use a “cumulative total multiplier”: when multiplier symbols hit,
+                their values are added to a running total that is applied to current and subsequent wins.
+              </p>
             </div>
 
             <div className="bg-slate-50 rounded p-2 space-y-1 border border-slate-200">
               <h4 className="text-green-600 font-bold text-sm">Special Bets & Buy Feature</h4>
-              <p>• Normal：bet multiplier 20×。</p>
-              <p>• Ante 1：40×，免费旋转触发概率 ×5。</p>
-              <p>• Ante 2：140×，免费旋转触发概率 ×5；免费局倍数最小 5×。</p>
-              <p>• Super 1：200×，每转至少 1 个倍数；禁止触发免费旋转。</p>
-              <p>• Super 2：5000×，每转至少 1 个倍数且最小 50×；禁止触发免费旋转。</p>
+              <p>• Normal: bet multiplier 20×.</p>
+              <p>• Ante 1: 40×, free‑spin trigger chance ×5.</p>
+              <p>• Ante 2: 140×, free‑spin trigger chance ×5; minimum multiplier value 5× during FS.</p>
+              <p>• Super 1: 200×, guarantees at least one multiplier each spin; Free Spins cannot trigger.</p>
+              <p>
+                • Super 2: 5000×, guarantees at least one multiplier each spin with minimum 50×; Free
+                Spins cannot trigger.
+              </p>
               <div className="mt-2 text-[11px] text-slate-500">
-                Buy Free Spins：{BUY_FREE_SPINS_COST}× total bet；Buy Super FS：{BUY_SUPER_FREE_SPINS_COST}× total bet（免费局最小倍数 5×）。
+                Buy Free Spins: {BUY_FREE_SPINS_COST}× total bet. Buy Super FS:{" "}
+                {BUY_SUPER_FREE_SPINS_COST}× total bet (minimum FS multiplier 5×).
               </div>
             </div>
           </div>
@@ -156,22 +179,27 @@ export const PaytableFortuneOlympus: React.FC = () => {
         {activeTab === "math" && (
           <div className="space-y-3 text-sm text-slate-600">
             <div className="bg-slate-50 rounded p-2 space-y-1 border border-slate-200">
-              <h4 className="text-emerald-600 font-bold text-sm">核心参数（规则图）</h4>
+              <h4 className="text-emerald-600 font-bold text-sm">Core parameters (help-screen values)</h4>
               <ul className="list-disc pl-4 space-y-1 text-xs">
-                <li>理论 RTP：96.55%</li>
-                <li>波动率：高（High）</li>
+                <li>Theoretical RTP: 96.55%</li>
+                <li>Volatility: High</li>
                 <li>
-                  最大赢分：
-                  <span className="font-semibold text-amber-600"> {MAX_WIN_MULTIPLIER.toLocaleString()}× bet</span>
+                  Max win:
+                  <span className="font-semibold text-amber-600">
+                    {" "}
+                    {MAX_WIN_MULTIPLIER.toLocaleString()}× bet
+                  </span>
                 </li>
               </ul>
             </div>
 
             <div className="bg-emerald-50 rounded p-2 space-y-1 border border-emerald-200">
-              <h4 className="text-emerald-700 font-bold text-sm">关于本项目的数学模型</h4>
+              <h4 className="text-emerald-700 font-bold text-sm">About this project&apos;s math model</h4>
               <p className="text-xs text-slate-600">
-                该版本沿用当前仓库的 simulation-first 风格（权重 + 概率旋钮 + RTP 缩放）。由于缺少官方 PAR sheet，
-                触发频率与分布可能与实机存在偏差，但规则与参数口径保持一致，便于后续继续拟合校准。
+                This implementation follows a simulation‑first approach (symbol weights, probability
+                knobs, RTP scaling). Because no official PAR sheet is available, trigger frequencies and
+                distributions may differ from the production game, but rule semantics and parameter
+                structure are kept aligned so that further fitting and calibration can be done.
               </p>
             </div>
           </div>

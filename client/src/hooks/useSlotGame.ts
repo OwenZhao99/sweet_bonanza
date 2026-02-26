@@ -1552,7 +1552,10 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
   }, [clearTimer]);
 
   const setTargetRtp = useCallback((targetRtp: number) => {
-    const clamped = Math.max(10, Math.min(200, targetRtp));
+    // GLI-19: theoretical RTP for house-banked games must be ≥ 75%.
+    const MIN_RTP = 75;
+    const MAX_RTP = 200;
+    const clamped = Math.max(MIN_RTP, Math.min(MAX_RTP, targetRtp));
     const activeIsOlympus = stateRef.current.gameId === "gates-of-olympus-1000";
     const activeIsFortune = stateRef.current.gameId === "fortune-of-olympus";
     if (activeIsOlympus) {

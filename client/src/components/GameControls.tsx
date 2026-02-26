@@ -1,6 +1,6 @@
 /**
- * Sweet Bonanza 1000 复刻版 - 游戏控制面板（紧凑版）
- * 设计风格：教学型数学可视化
+ * Sweet Bonanza 1000 Replica – Compact Game Controls Panel
+ * Design style: teaching-oriented math visualization
  */
 
 import React, { useState } from "react";
@@ -108,27 +108,27 @@ export const GameControls: React.FC<GameControlsProps> = ({
 
   return (
     <div className="space-y-3">
-      {/* 余额显示 */}
+      {/* Balance & effective bet */}
       <div className="bg-slate-800/60 rounded-lg px-3 py-2 border border-slate-700/40">
         <div className="flex justify-between items-baseline">
           <div>
-            <div className="text-[9px] text-slate-500 uppercase">余额</div>
+            <div className="text-[9px] text-slate-500 uppercase">Balance</div>
             <div className="text-base font-bold font-mono text-white">
-              {balance.toFixed(2)}<span className="text-xs text-slate-400 ml-0.5">元</span>
+              {balance.toFixed(2)}<span className="text-xs text-slate-400 ml-0.5">units</span>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[9px] text-slate-500 uppercase">有效下注</div>
+            <div className="text-[9px] text-slate-500 uppercase">Effective Bet</div>
             <div className="text-base font-bold font-mono text-amber-400">
-              {effectiveBet.toFixed(2)}<span className="text-xs text-slate-400 ml-0.5">元</span>
+              {effectiveBet.toFixed(2)}<span className="text-xs text-slate-400 ml-0.5">units</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 下注选择 */}
+      {/* Bet selection */}
       <div>
-        <div className="text-[9px] text-slate-500 uppercase tracking-wide mb-1">下注额</div>
+        <div className="text-[9px] text-slate-500 uppercase tracking-wide mb-1">Bet Amount</div>
         <div className="grid grid-cols-3 gap-1">
           {BET_OPTIONS.map((b) => (
             <button
@@ -149,7 +149,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
         </div>
       </div>
 
-      {/* 前注 / Special Bets */}
+      {/* Ante / Special Bets */}
       {isFortune ? (
         <div>
           <div className="text-[9px] text-slate-500 uppercase tracking-wide mb-1">Special Bets</div>
@@ -183,12 +183,12 @@ export const GameControls: React.FC<GameControlsProps> = ({
         </div>
       ) : (
         <div>
-          <div className="text-[9px] text-slate-500 uppercase tracking-wide mb-1">前注 (Ante Bet)</div>
+          <div className="text-[9px] text-slate-500 uppercase tracking-wide mb-1">Ante Bet</div>
           <div className="space-y-1">
             {([
-              { mode: "none" as AnteBetMode, label: "关闭" },
-              { mode: "x20" as AnteBetMode, label: "+25% 可购买FS" },
-              { mode: "x25" as AnteBetMode, label: "+25% 散落×2" },
+              { mode: "none" as AnteBetMode, label: "Off" },
+              { mode: "x20" as AnteBetMode, label: "+25% bet, Buy FS enabled" },
+              { mode: "x25" as AnteBetMode, label: "+25% bet, Scatter ×2" },
             ]).map(({ mode, label }) => (
               <button
                 key={mode}
@@ -209,7 +209,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
         </div>
       )}
 
-      {/* 旋转按钮 */}
+      {/* Spin button */}
       <button
         onClick={onSpin}
         disabled={!canSpin}
@@ -224,17 +224,17 @@ export const GameControls: React.FC<GameControlsProps> = ({
         )}
       >
         {isActive
-          ? "旋转中..."
+          ? "Spinning..."
           : isFreeSpins
-          ? `⭐ 免费旋转中... (${freeSpinsRemaining})`
-          : "▶ 旋转"}
+          ? `⭐ Free spins running... (${freeSpinsRemaining})`
+          : "▶ SPIN"}
       </button>
 
-      {/* 自动旋转区域 */}
+      {/* Auto Spin section */}
       <div className="bg-slate-800/40 rounded-lg p-2 border border-slate-700/30 space-y-2">
-        <div className="text-[9px] text-slate-500 uppercase tracking-wide">自动旋转</div>
+        <div className="text-[9px] text-slate-500 uppercase tracking-wide">Auto Spin</div>
 
-        {/* 快捷次数 */}
+        {/* Preset counts */}
         <div className="grid grid-cols-4 gap-1">
           {AUTO_SPIN_PRESETS.map((n) => (
             <button
@@ -254,7 +254,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
           ))}
         </div>
 
-        {/* 自定义次数输入 + 开始/停止按钮 */}
+        {/* Custom count input + start/stop buttons */}
         <div className="flex gap-1.5">
           <input
             type="number"
@@ -269,14 +269,14 @@ export const GameControls: React.FC<GameControlsProps> = ({
               "focus:outline-none focus:border-cyan-500/70",
               isAutoSpinning && "opacity-50 cursor-not-allowed"
             )}
-            placeholder="次数"
+            placeholder="Spins"
           />
           {isAutoSpinning ? (
             <button
               onClick={onStopAutoSpin}
               className="flex-1 py-1.5 rounded text-xs font-bold bg-red-600/80 text-white hover:bg-red-500/80 transition-colors border border-red-500/50"
             >
-              ⏹ 停止
+              ⏹ Stop
             </button>
           ) : (
             <button
@@ -289,16 +289,16 @@ export const GameControls: React.FC<GameControlsProps> = ({
                   : "bg-slate-700/40 text-slate-600 cursor-not-allowed border-slate-700/30"
               )}
             >
-              ▶▶ 开始
+              ▶▶ Start
             </button>
           )}
         </div>
 
-        {/* 自动旋转进度条 */}
+        {/* Auto spin progress bar */}
         {isAutoSpinning && (
           <div className="space-y-1">
             <div className="flex justify-between text-[9px] text-slate-500">
-              <span>进度</span>
+              <span>Progress</span>
               <span className="font-mono text-cyan-400">
                 {autoSpinTotal - autoSpinRemaining} / {autoSpinTotal}
               </span>
@@ -310,13 +310,13 @@ export const GameControls: React.FC<GameControlsProps> = ({
               />
             </div>
             <div className="text-[9px] text-slate-500 text-center">
-              剩余 <span className="font-mono text-cyan-400">{autoSpinRemaining}</span> 次
+              Remaining <span className="font-mono text-cyan-400">{autoSpinRemaining}</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* 动画开关 */}
+      {/* Animation toggle */}
       <button
         onClick={onToggleAnimations}
         className={cn(
@@ -326,13 +326,13 @@ export const GameControls: React.FC<GameControlsProps> = ({
             : "bg-emerald-900/40 border-emerald-600/50 text-emerald-300 hover:bg-emerald-800/40"
         )}
       >
-        {animationsEnabled ? "🎬 动画：开启（点击关闭加速）" : "⚡ 动画：关闭（极速模式）"}
+        {animationsEnabled ? "🎬 Animation: ON (click to speed up)" : "⚡ Animation: OFF (turbo mode)"}
       </button>
 
-      {/* 购买功能 */}
+      {/* Buy feature */}
       {!isFreeSpins && anteBetMode !== "x25" && (
         <div className="space-y-1">
-          <div className="text-[9px] text-slate-500 uppercase tracking-wide">购买功能</div>
+          <div className="text-[9px] text-slate-500 uppercase tracking-wide">Buy Feature</div>
           <button
             onClick={() => onBuyFreeSpins(false)}
             disabled={!canBuyFS || fortuneIsSuper}
@@ -343,7 +343,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
                 : "bg-slate-800/30 border-slate-700/30 text-slate-600 cursor-not-allowed"
             )}
           >
-            购买免费旋转 <span className="font-mono text-purple-400">{buyFSCost.toFixed(0)}x</span>
+            Buy Free Spins <span className="font-mono text-purple-400">{buyFSCost.toFixed(0)}x</span>
           </button>
           {(isSweet || isFortune) && (
             <button
@@ -356,13 +356,13 @@ export const GameControls: React.FC<GameControlsProps> = ({
                   : "bg-slate-800/30 border-slate-700/30 text-slate-600 cursor-not-allowed",
               )}
             >
-              购买超级FS <span className="font-mono text-yellow-400">{buySFSCost.toFixed(0)}x</span>
+              Buy Super FS <span className="font-mono text-yellow-400">{buySFSCost.toFixed(0)}x</span>
             </button>
           )}
         </div>
       )}
 
-      {/* 充值和重置 */}
+      {/* Top up & reset */}
       <div className="flex gap-1.5">
         <button
           onClick={() => onAddBalance(1000)}
@@ -375,20 +375,20 @@ export const GameControls: React.FC<GameControlsProps> = ({
           disabled={isActive || isAutoSpinning}
           className="flex-1 py-1.5 rounded text-xs text-slate-400 bg-slate-800/40 border border-slate-700/30 hover:bg-slate-700/40 transition-colors disabled:opacity-50"
         >
-          重置
+          Reset
         </button>
       </div>
 
-      {/* RTP 设置 */}
+      {/* RTP settings */}
       <div className="space-y-1">
         <div className="text-[9px] text-slate-500 uppercase tracking-wide flex items-center justify-between">
-          <span>目标 RTP 设置</span>
-          <span className="font-mono text-orange-400">当前: {currentTargetRtp.toFixed(1)}%</span>
+          <span>Target RTP</span>
+          <span className="font-mono text-orange-400">Current: {currentTargetRtp.toFixed(1)}%</span>
         </div>
         <div className="flex gap-1.5">
           <input
             type="number"
-            min={10}
+            min={75}
             max={200}
             step={0.1}
             value={rtpInput}
@@ -407,11 +407,11 @@ export const GameControls: React.FC<GameControlsProps> = ({
             }}
             className="px-3 py-1.5 rounded text-xs font-bold bg-orange-700/60 border border-orange-600/50 text-orange-100 hover:bg-orange-600/60 transition-colors"
           >
-            设置
+            Apply
           </button>
         </div>
         <div className="flex gap-1">
-          {[50, 80, 96.53, 110, 150].map((v) => (
+          {[75, 96.53, 110, 150].map((v) => (
             <button
               key={v}
               onClick={() => { setRtpInput(String(v)); onSetTargetRtp(v); }}
@@ -427,13 +427,15 @@ export const GameControls: React.FC<GameControlsProps> = ({
           ))}
         </div>
         <div className="text-[9px] text-slate-600 leading-tight">
-          调整赔率系数模拟不同 RTP。理论值 96.53%
+          Displays the long‑term <strong>theoretical RTP (excluding any jackpots)</strong>, based on
+          the underlying math model and large Monte Carlo samples. Single spins can deviate
+          substantially from this value. The minimum allowed configuration is 75%.
         </div>
       </div>
 
-      {/* 快捷键提示 */}
+      {/* Keyboard shortcut hint */}
       <div className="text-[9px] text-slate-700 text-center">
-        空格键 / 回车键 快速旋转
+        Press Space / Enter to spin quickly
       </div>
     </div>
   );

@@ -219,7 +219,12 @@ export function handleSpinRequest(payload: SpinRequestPayload): SpinResponseDto 
   if (payload.configOverride) {
     const { targetRtp, volatility } = payload.configOverride;
     if (typeof targetRtp === "number" && Number.isFinite(targetRtp) && targetRtp > 0) {
-      setRtpMultiplier(targetRtp);
+      // GLI-19: house-banked games must have theoretical RTP ≥ 75%.
+      // Clamp any runtime override into a compliant range.
+      const MIN_RTP = 75;
+      const MAX_RTP = 200;
+      const clampedRtp = Math.max(MIN_RTP, Math.min(MAX_RTP, targetRtp));
+      setRtpMultiplier(clampedRtp);
     }
     if (volatility) {
       setVolatility(volatility);

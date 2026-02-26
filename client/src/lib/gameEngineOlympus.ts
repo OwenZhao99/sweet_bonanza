@@ -520,20 +520,16 @@ export function spin(
 // ============================================================
 
 export function buyFreeSpinsTriggerGrid(anteBet25x = false): { grid: GridCell[]; multipliers: MultiplierCell[] } {
-  let attempts = 0;
+  // For the Buy Free Spins feature we must not "manufacture" outcomes.
+  // Instead, we repeatedly sample full RNG-driven grids until we
+  // naturally obtain a triggering spin (scatterCount ≥ SCATTER_TRIGGER_BASE),
+  // which corresponds to drawing from the conditional distribution
+  // over triggering spins only.
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { grid, multipliers } = generateGrid(anteBet25x);
     const res = calculateWins(grid, anteBet25x);
-    if (res.scatterCount >= SCATTER_TRIGGER_BASE) return { grid, multipliers };
-    attempts++;
-    if (attempts > 200) {
-      // force 4 scatters if unlucky
-      const forced = new Set<number>();
-      while (forced.size < 4) forced.add(Math.floor(Math.random() * GRID_SIZE));
-      Array.from(forced).forEach((pos) => {
-        grid[pos] = "scatter";
-        multipliers[pos] = null;
-      });
+    if (res.scatterCount >= SCATTER_TRIGGER_BASE) {
       return { grid, multipliers };
     }
   }

@@ -755,23 +755,17 @@ function clampScatterCount(n: number): number {
 export function buyFreeSpinsTriggerGrid(
   betMode: FortuneBetMode = "normal",
 ): { grid: GridCell[]; multipliers: MultiplierCell[]; scatterCount: number } {
-  let attempts = 0;
+  // GLI-19 requires that buy features use RNG-driven outcomes instead of
+  // forcefully injecting scatters after a number of failed attempts.
+  // We therefore use conditional sampling: only spins that naturally produce
+  // 4–7 scatters are accepted; all others are discarded. This is equivalent
+  // to sampling from the conditional distribution “spin triggers Free Spins”.
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { grid, multipliers } = generateGrid(betMode);
     const res = calculateWins(grid, { betMode, isFreeSpins: false });
     if (res.scatterCount >= SCATTER_TRIGGER_BASE && res.scatterCount <= MAX_SCATTER_COUNT) {
       return { grid, multipliers, scatterCount: res.scatterCount };
-    }
-    attempts++;
-    if (attempts > 500) {
-      const forcedCount = clampScatterCount(SCATTER_TRIGGER_BASE + Math.floor(Math.random() * 4)); // 4–7
-      const forced = new Set<number>();
-      while (forced.size < forcedCount) forced.add(Math.floor(Math.random() * GRID_SIZE));
-      Array.from(forced).forEach((pos) => {
-        grid[pos] = "scatter";
-        multipliers[pos] = null;
-      });
-      return { grid, multipliers, scatterCount: forcedCount };
     }
   }
 }

@@ -1,8 +1,8 @@
 /**
- * Sweet Bonanza 1000 复刻版 - 游戏网格组件
- * 设计风格：教学型数学可视化（亮色主题）
- * 6列 × 5行 = 30个格子，使用简洁图形表示符号
- * 动画：赢的符号淡出消失，新符号从上方缓慢落下
+ * Sweet Bonanza 1000 Replica – Game Grid Component
+ * Style: light, teaching-oriented math visualization
+ * Default layout: 6 columns × 5 rows = 30 cells
+ * Animations: winning symbols fade out and new symbols drop in from above
  */
 
 import React, { useEffect, useState } from "react";
@@ -28,7 +28,7 @@ interface GameGridProps {
   droppingPositions?: number[];
 }
 
-// 符号颜色映射（亮色背景）
+// Symbol color & background mapping (light theme)
 const SYMBOL_SHAPES: Record<string, { shape: string; color: string; bg: string }> = {
   heart:      { shape: "♥",  color: "#dc2626", bg: "rgba(254,226,226,0.95)" },
   purple:     { shape: "◆",  color: "#9333ea", bg: "rgba(243,232,255,0.95)" },
@@ -128,7 +128,7 @@ const Cell: React.FC<CellProps> = ({
     >
       {!hasMultiplier && (
         <>
-          {/* 符号图形 */}
+          {/* Symbol glyph */}
           <span
             className="text-3xl leading-none select-none"
             style={{ color: shape?.color || "#64748b" }}
@@ -136,7 +136,7 @@ const Cell: React.FC<CellProps> = ({
             {shape?.shape || "?"}
           </span>
 
-          {/* 符号名称（小字） */}
+          {/* Symbol name (small label) */}
           <span className="text-[10px] font-medium text-slate-600 mt-0.5 leading-none">
             {sym?.name || symbolId}
           </span>
@@ -154,7 +154,7 @@ const Cell: React.FC<CellProps> = ({
         </div>
       )}
 
-      {/* 获胜高亮效果 */}
+      {/* Winning highlight overlay */}
       {isWin && (
         <div className="absolute inset-0 bg-yellow-300/20 rounded animate-pulse" />
       )}
@@ -194,14 +194,14 @@ export const GameGrid: React.FC<GameGridProps> = ({
       )}
       style={{ overflow: "hidden" }}
     >
-      {/* 免费旋转标识 */}
+      {/* Free spins indicator */}
       {isFreeSpins && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-500 text-black text-xs font-bold px-3 py-0.5 rounded-full z-20">
           FREE SPINS
         </div>
       )}
 
-      {/* 网格 - overflow visible to allow drop animation from above */}
+      {/* Grid – overflow hidden while still allowing drop animation above the board */}
       <div
         className="grid gap-0.5 flex-1 min-h-0"
         style={{
@@ -236,7 +236,7 @@ export const GameGrid: React.FC<GameGridProps> = ({
         })}
       </div>
 
-      {/* 列标签 */}
+      {/* Column labels */}
       <div
         className="grid gap-1 mt-1"
         style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
