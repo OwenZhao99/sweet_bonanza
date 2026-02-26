@@ -29,6 +29,16 @@ const GAME_LIST: GameEntry[] = [
     category: "Cluster Pays",
   },
   {
+    id: "sugar-rush-1000",
+    name: "Sugar Rush 1000",
+    provider: "Pragmatic Play",
+    icon: "🍭",
+    rtp: 96.53,
+    volatility: "Very High",
+    status: "active",
+    category: "Cluster Pays",
+  },
+  {
     id: "gates-of-olympus-1000",
     name: "Gates of Olympus 1000",
     provider: "Pragmatic Play",

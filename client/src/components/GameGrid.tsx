@@ -8,13 +8,29 @@
 import React, { useEffect, useState } from "react";
 import { GridCell, MultiplierCell, SYMBOL_MAP } from "@/lib/gameEngine";
 import { SYMBOL_MAP as OLYMPUS_SYMBOL_MAP } from "@/lib/gameEngineOlympus";
-import type { GridCell as OlympusGridCell, MultiplierCell as OlympusMultiplierCell } from "@/lib/gameEngineOlympus";
+import type {
+  GridCell as OlympusGridCell,
+  MultiplierCell as OlympusMultiplierCell,
+} from "@/lib/gameEngineOlympus";
 import { SYMBOL_MAP as FORTUNE_SYMBOL_MAP } from "@/lib/gameEngineFortuneOlympus";
-import type { GridCell as FortuneGridCell, MultiplierCell as FortuneMultiplierCell } from "@/lib/gameEngineFortuneOlympus";
+import type {
+  GridCell as FortuneGridCell,
+  MultiplierCell as FortuneMultiplierCell,
+} from "@/lib/gameEngineFortuneOlympus";
+import { SYMBOL_MAP as SUGAR_SYMBOL_MAP } from "@/lib/gameEngineSugarRush";
+import type {
+  GridCell as SugarGridCell,
+  MultiplierSpotCell as SugarMultiplierSpotCell,
+} from "@/lib/gameEngineSugarRush";
 import { cn } from "@/lib/utils";
 
-type AnyGridCell = GridCell | OlympusGridCell | FortuneGridCell;
-type AnyMultiplierCell = MultiplierCell | OlympusMultiplierCell | FortuneMultiplierCell;
+type AnyGridCell = GridCell | OlympusGridCell | FortuneGridCell | SugarGridCell;
+type AnyMultiplierCell =
+  | MultiplierCell
+  | OlympusMultiplierCell
+  | FortuneMultiplierCell
+  | SugarMultiplierSpotCell
+  | null;
 
 interface GameGridProps {
   grid: AnyGridCell[];
@@ -52,6 +68,14 @@ const SYMBOL_SHAPES: Record<string, { shape: string; color: string; bg: string }
   helmet:     { shape: "🪖", color: "#fb923c", bg: "rgba(255,237,213,0.95)" },
   // purple already exists
   // green/blue already exist
+  // Sugar Rush 1000
+  pink_ball:    { shape: "🍬", color: "#fb7185", bg: "rgba(254,242,242,0.95)" },
+  orange_bean:  { shape: "🍊", color: "#fb923c", bg: "rgba(255,247,237,0.95)" },
+  purple_bean:  { shape: "🍇", color: "#a855f7", bg: "rgba(245,243,255,0.95)" },
+  green_star:   { shape: "⭐", color: "#22c55e", bg: "rgba(240,253,244,0.95)" },
+  red_bear:     { shape: "🧸", color: "#ef4444", bg: "rgba(254,226,226,0.95)" },
+  purple_bear:  { shape: "🧸", color: "#c084fc", bg: "rgba(245,243,255,0.95)" },
+  orange_bear:  { shape: "🧸", color: "#f97316", bg: "rgba(255,237,213,0.95)" },
 };
 
 interface CellProps {
@@ -100,7 +124,8 @@ const Cell: React.FC<CellProps> = ({
   const sym = symbolId
     ? (SYMBOL_MAP as any)[symbolId] ||
       (OLYMPUS_SYMBOL_MAP as any)[symbolId] ||
-      (FORTUNE_SYMBOL_MAP as any)[symbolId]
+      (FORTUNE_SYMBOL_MAP as any)[symbolId] ||
+      (SUGAR_SYMBOL_MAP as any)[symbolId]
     : null;
 
   // Calculate drop distance in % of cell height (each row = 100%)

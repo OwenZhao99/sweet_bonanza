@@ -40,6 +40,14 @@ import type {
   TumbleStep as FortuneTumbleStep,
   FortuneBetMode,
 } from "@/lib/gameEngineFortuneOlympus";
+import * as Sugar from "@/lib/gameEngineSugarRush";
+import type {
+  GridCell as SugarGridCell,
+  MultiplierGrid as SugarMultiplierGrid,
+  FullSpinResult as SugarFullSpinResult,
+  TumbleStep as SugarTumbleStep,
+  MultiplierSpotCell as SugarMultiplierSpotCell,
+} from "@/lib/gameEngineSugarRush";
 
 export type GamePhase =
   | "idle"
@@ -53,7 +61,11 @@ export type GamePhase =
 
 export type AnteBetMode = "none" | "x20" | "x25";
 
-export type GameId = "sweet-bonanza-1000" | "gates-of-olympus-1000" | "fortune-of-olympus";
+export type GameId =
+  | "sweet-bonanza-1000"
+  | "gates-of-olympus-1000"
+  | "fortune-of-olympus"
+  | "sugar-rush-1000";
 
 // ============================================================
 // Spin History Record
@@ -75,14 +87,30 @@ export interface GameState {
   balance: number;
   bet: number;
   gameId: GameId;
-  grid: (SweetGridCell | OlympusGridCell | FortuneGridCell)[];
-  multipliers: (SweetMultiplierCell | OlympusMultiplierCell | FortuneMultiplierCell)[];
+  grid: (SweetGridCell | OlympusGridCell | FortuneGridCell | SugarGridCell)[];
+  multipliers: (
+    | SweetMultiplierCell
+    | OlympusMultiplierCell
+    | FortuneMultiplierCell
+    | SugarMultiplierSpotCell
+    | null
+  )[];
   winPositions: number[];
   currentWinSymbol: string | null;
   phase: GamePhase;
-  currentSpinResult: (SweetFullSpinResult | OlympusFullSpinResult | FortuneFullSpinResult) | null;
+  currentSpinResult:
+    | SweetFullSpinResult
+    | OlympusFullSpinResult
+    | FortuneFullSpinResult
+    | SugarFullSpinResult
+    | null;
   currentTumbleIndex: number;
-  currentTumbleStep: (SweetTumbleStep | OlympusTumbleStep | FortuneTumbleStep) | null;
+  currentTumbleStep:
+    | SweetTumbleStep
+    | OlympusTumbleStep
+    | FortuneTumbleStep
+    | SugarTumbleStep
+    | null;
   spinWin: number;
   spinWinMultiplier: number;
   freeSpinsRemaining: number;
@@ -101,6 +129,8 @@ export interface GameState {
   lastFinalMultiplierSum: number; // Olympus final multiplier sum (per sequence)
   freeSpinsMeterMode: "none" | "per_spin" | "across_spins";
   savedOlympusFsMultiplierChance: number | null;
+  // Sugar Rush: persistent multiplier hit-counts across free spins
+  sugarFsHitCounts: number[] | null;
   message: string;
   autoSpin: boolean;
   autoSpinCount: number;
@@ -122,6 +152,7 @@ const DEFAULT_BALANCE = 100000;
 function getGridSize(gameId: GameId): number {
   if (gameId === "gates-of-olympus-1000") return Olympus.GRID_SIZE;
   if (gameId === "fortune-of-olympus") return Fortune.GRID_SIZE;
+  if (gameId === "sugar-rush-1000") return Sugar.GRID_SIZE;
   return SWEET_GRID_SIZE;
 }
 
@@ -157,6 +188,7 @@ function createInitialState(gameId: GameId): GameState {
     lastFinalMultiplierSum: 0,
     freeSpinsMeterMode: "none",
     savedOlympusFsMultiplierChance: null,
+    sugarFsHitCounts: null,
     message:
       gameId === "gates-of-olympus-1000"
         ? "Press SPIN to start (Olympus)"
@@ -225,7 +257,7 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
 
   const runTumbleSequence = useCallback(
     (
-      spinResult: SweetFullSpinResult | OlympusFullSpinResult | FortuneFullSpinResult,
+      spinResult: SweetFullSpinResult | OlympusFullSpinResult | FortuneFullSpinResult | SugarFullSpinResult,
       betAmount: number,
       isFreeSpins: boolean,
       currentFreeSpinsRemaining: number,
@@ -236,6 +268,7 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
       const anim = stateRef.current.animationsEnabled;
       const activeIsOlympus = stateRef.current.gameId === "gates-of-olympus-1000";
       const activeIsFortune = stateRef.current.gameId === "fortune-of-olympus";
+      const activeIsSugar = stateRef.current.gameId === "sugar-rush-1000";
 
       if (steps.length === 0) {
         // In free spins, don't count bet or spins (already counted in the triggering spin)
@@ -251,6 +284,9 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
             if (award > 0) newRemaining += award;
           } else if (activeIsOlympus) {
             if (spinResult.scatterCount >= Olympus.SCATTER_RETRIGGER_FS) newRemaining += Olympus.FREE_SPINS_RETRIGGER;
+          } else if (activeIsSugar) {
+            const award = Sugar.freeSpinsForScatterCount(spinResult.scatterCount);
+            if (award > 0) newRemaining += award;
           } else {
             if (spinResult.scatterCount >= RETRIGGER_SCATTER) newRemaining += FREE_SPINS_RETRIGGER;
           }
@@ -286,6 +322,8 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                     betMode: fsState.fortuneBetMode,
                     minMultiplierValue: fsState.fortuneFeatureMinMultiplierValue,
                   })
+                : activeIsSugar
+                ? Sugar.spin(true, fsState.isSuperFreeSpins, fsState.sugarFsHitCounts ?? undefined)
                 : spin(true, fsState.isSuperFreeSpins, false);
               updateState((prev) => ({
                 ...prev,
@@ -647,6 +685,141 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
             return;
           }
 
+          if (activeIsSugar) {
+            const sugarSpin = spinResult as SugarFullSpinResult;
+            const finalWinMultiplier = sugarSpin.totalPayout;
+            const totalWin = finalWinMultiplier * betAmount;
+            const statsBet = isFreeSpins ? 0 : betAmount;
+            const newStats = updateStats(
+              currentStats,
+              statsBet,
+              finalWinMultiplier,
+              steps.length,
+              sugarSpin.triggersBonus,
+              isFreeSpins,
+              betAmount,
+            );
+
+            const newHitCounts = sugarSpin.finalHitCounts;
+
+            if (isFreeSpins) {
+              let newTotalWin = currentFreeSpinsTotalWin + totalWin;
+              let newRemaining = currentFreeSpinsRemaining - 1;
+
+              const retriggerAward = Sugar.freeSpinsForScatterCount(sugarSpin.scatterCount);
+              const retriggered = retriggerAward > 0;
+              if (retriggered) newRemaining += retriggerAward;
+
+              const totalWinMultiplier = newTotalWin / betAmount;
+              if (totalWinMultiplier >= Sugar.MAX_WIN_MULTIPLIER) {
+                newTotalWin = Sugar.MAX_WIN_MULTIPLIER * betAmount;
+                newRemaining = 0;
+              }
+
+              if (newRemaining <= 0) {
+                updateState((prev) => ({
+                  ...prev,
+                  phase: "free_spins_end",
+                  grid: sugarSpin.finalGrid,
+                  multipliers: sugarSpin.finalMultipliers as (SweetMultiplierCell | OlympusMultiplierCell | FortuneMultiplierCell | SugarMultiplierSpotCell | null)[],
+                  winPositions: [],
+                  currentWinSymbol: null,
+                  balance: prev.balance,
+                  freeSpinsRemaining: 0,
+                  freeSpinsTotalWin: newTotalWin,
+                  spinWin: totalWin,
+                  spinWinMultiplier: finalWinMultiplier,
+                  stats: newStats,
+                  currentMultiplierTotal: sugarSpin.finalMultiplierSum,
+                  lastFinalMultiplierSum: sugarSpin.finalMultiplierSum,
+                  sugarFsHitCounts: newHitCounts,
+                  message: `Free Spins ended! Total win: ${newTotalWin.toFixed(2)}`,
+                }));
+              } else {
+                const retriggerMsg = retriggered
+                  ? `Retriggered! +${retriggerAward} spins! ${newRemaining} remaining`
+                  : `${newRemaining} free spins remaining`;
+                updateState((prev) => ({
+                  ...prev,
+                  phase: "free_spins_spinning",
+                  grid: sugarSpin.finalGrid,
+                  multipliers: sugarSpin.finalMultipliers as (SweetMultiplierCell | OlympusMultiplierCell | FortuneMultiplierCell | SugarMultiplierSpotCell | null)[],
+                  winPositions: [],
+                  currentWinSymbol: null,
+                  balance: prev.balance,
+                  freeSpinsRemaining: newRemaining,
+                  freeSpinsTotalWin: newTotalWin,
+                  spinWin: totalWin,
+                  spinWinMultiplier: finalWinMultiplier,
+                  stats: newStats,
+                  currentMultiplierTotal: sugarSpin.finalMultiplierSum,
+                  lastFinalMultiplierSum: sugarSpin.finalMultiplierSum,
+                  sugarFsHitCounts: newHitCounts,
+                  message: retriggerMsg,
+                }));
+                timerRef.current = setTimeout(() => {
+                  const fsState = stateRef.current;
+                  const fsResult = Sugar.spin(true, fsState.isSuperFreeSpins, newHitCounts);
+                  updateState((prev) => ({
+                    ...prev,
+                    grid: fsResult.initialGrid,
+                    multipliers: fsResult.initialMultipliers as (SweetMultiplierCell | OlympusMultiplierCell | FortuneMultiplierCell | SugarMultiplierSpotCell | null)[],
+                    winPositions: [],
+                    currentSpinResult: fsResult,
+                    lastScatterCount: fsResult.scatterCount,
+                    sugarFsHitCounts: fsResult.finalHitCounts,
+                    message: `Free spinning... ${newRemaining} left`,
+                  }));
+                  runTumbleSequence(
+                    fsResult,
+                    betAmount,
+                    true,
+                    newRemaining,
+                    newTotalWin,
+                    newStats,
+                  );
+                }, anim ? 800 : 0);
+              }
+            } else {
+              const spinNum = stateRef.current.totalSpinCounter;
+              const record: SpinRecord = {
+                id: Date.now() + Math.random(),
+                spinNumber: spinNum,
+                bet: betAmount,
+                win: totalWin,
+                multiplier: finalWinMultiplier,
+                tumbles: steps.length,
+                triggeredFS: sugarSpin.triggersBonus,
+                isFreeSpins: false,
+                timestamp: Date.now(),
+              };
+
+              updateState((prev) => ({
+                ...prev,
+                phase: "idle",
+                grid: sugarSpin.finalGrid,
+                multipliers: sugarSpin.finalMultipliers as (SweetMultiplierCell | OlympusMultiplierCell | FortuneMultiplierCell | SugarMultiplierSpotCell | null)[],
+                winPositions: [],
+                currentWinSymbol: null,
+                droppingPositions: [],
+                balance: prev.balance + totalWin,
+                spinWin: totalWin,
+                spinWinMultiplier: finalWinMultiplier,
+                stats: newStats,
+                currentMultiplierTotal: sugarSpin.finalMultiplierSum,
+                lastFinalMultiplierSum: sugarSpin.finalMultiplierSum,
+                sugarFsHitCounts: null,
+                message:
+                  totalWin > 0
+                    ? `Win: ${totalWin.toFixed(2)} (${finalWinMultiplier.toFixed(2)}x)`
+                    : "No win — try again!",
+                spinHistory: [record, ...prev.spinHistory].slice(0, 1000),
+              }));
+              scheduleNextAutoSpin(betAmount);
+            }
+            return;
+          }
+
           // === Sweet settlement ===
           const meterMode = stateRef.current.freeSpinsMeterMode;
           const meterBefore = stateRef.current.featureMultiplierMeter || 0;
@@ -859,7 +1032,7 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
         );
 
         // Phase 1: Show winning symbols highlighted (500ms)
-        const activeIsSweet = !activeIsOlympus && !activeIsFortune;
+        const activeIsSweet = !activeIsOlympus && !activeIsFortune && !activeIsSugar;
         const sweetMultiplierTotal = activeIsSweet ? (step as SweetTumbleStep).multiplierTotal : 0;
         updateState((prev) => ({
           ...prev,
@@ -984,6 +1157,7 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
       const currentState = stateRef.current;
       const activeIsOlympus = currentState.gameId === "gates-of-olympus-1000";
       const activeIsFortune = currentState.gameId === "fortune-of-olympus";
+      const activeIsSugar = currentState.gameId === "sugar-rush-1000";
       const anteBet25x = currentState.anteBetMode === "x25";
       const effectiveBet = getEffectiveBet(currentState);
       const anim = currentState.animationsEnabled;
@@ -1009,6 +1183,12 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
             betMode: currentState.fortuneBetMode,
             minMultiplierValue: currentState.fortuneFeatureMinMultiplierValue,
           })
+        : activeIsSugar
+        ? Sugar.spin(
+            isFreeSpins,
+            isSuperFreeSpins,
+            isFreeSpins ? currentState.sugarFsHitCounts ?? undefined : undefined,
+          )
         : spin(isFreeSpins, isSuperFreeSpins, anteBet25x);
 
       // Increment spin counter
@@ -1558,6 +1738,7 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
     const clamped = Math.max(MIN_RTP, Math.min(MAX_RTP, targetRtp));
     const activeIsOlympus = stateRef.current.gameId === "gates-of-olympus-1000";
     const activeIsFortune = stateRef.current.gameId === "fortune-of-olympus";
+    const activeIsSugar = stateRef.current.gameId === "sugar-rush-1000";
     if (activeIsOlympus) {
       Olympus.setRtpMultiplier(clamped);
       updateState((prev) => ({
@@ -1569,6 +1750,12 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
       updateState((prev) => ({
         ...prev,
         message: `Target RTP set to ${clamped.toFixed(2)}% (Fortune)`,
+      }));
+    } else if (activeIsSugar) {
+      Sugar.setRtpMultiplier(clamped);
+      updateState((prev) => ({
+        ...prev,
+        message: `Target RTP set to ${clamped.toFixed(2)}% (Sugar Rush 1000)`,
       }));
     } else {
       setRtpMultiplier(clamped);
@@ -1599,6 +1786,7 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
   const getTargetRtpLocal = useCallback(() => {
     if (stateRef.current.gameId === "gates-of-olympus-1000") return Olympus.getTargetRtp();
     if (stateRef.current.gameId === "fortune-of-olympus") return Fortune.getTargetRtp();
+    if (stateRef.current.gameId === "sugar-rush-1000") return Sugar.getTargetRtp();
     return getTargetRtp();
   }, []);
 

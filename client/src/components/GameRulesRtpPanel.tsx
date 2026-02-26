@@ -20,12 +20,15 @@ export const GameRulesRtpPanel: React.FC<GameRulesRtpPanelProps> = ({
   const isSweet = gameId === "sweet-bonanza-1000";
   const isOlympus = gameId === "gates-of-olympus-1000";
   const isFortune = gameId === "fortune-of-olympus";
+  const isSugar = gameId === "sugar-rush-1000";
 
   const gameName = isSweet
     ? "Sweet Bonanza 1000"
     : isOlympus
     ? "Gates of Olympus 1000"
-    : "Fortune of Olympus";
+    : isFortune
+    ? "Fortune of Olympus"
+    : "Sugar Rush 1000";
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col h-full">
@@ -176,6 +179,46 @@ export const GameRulesRtpPanel: React.FC<GameRulesRtpPanelProps> = ({
                 <p>
                   • All cluster wins for a spin are summed, then multiplied by the total multiplier value
                   on screen; in Free Spins, a running total multiplier can carry across spins.
+                </p>
+              </>
+            )}
+            {isSugar && (
+              <>
+                <p>
+                  • 3 / 4 / 5 / 6 / 7 scatters anywhere on the screen trigger{" "}
+                  10 / 12 / 15 / 20 / 30 free spins respectively.
+                </p>
+                <p>
+                  • During Free Spins, marked spots and their multipliers remain in place between
+                  spins and can increase when further wins land on them; additional 3–7 scatters
+                  award extra free spins using the same ladder.
+                </p>
+                <p>
+                  • Buy Free Spins and Buy Super Free Spins purchase entry into the bonus at fixed
+                  prices (100× / 500× total bet); Super Free Spins start with all positions marked
+                  at x2.
+                </p>
+              </>
+            )}
+            {isSugar && (
+              <>
+                <p>• 7 × 7 grid with a cluster‑pays mechanic.</p>
+                <p>
+                  • A cluster is a group of{" "}
+                  <span className="font-semibold text-emerald-700">
+                    5 or more horizontally/vertically adjacent
+                  </span>{" "}
+                  matching symbols; payout is determined by the cluster size and symbol type.
+                </p>
+                <p>
+                  • Whenever a winning symbol explodes it marks its spot on the grid. From the second
+                  hit onward that spot gains a multiplier starting at x2 and doubling on each further
+                  hit, up to x1024; all multipliers under a winning cluster are added together and
+                  applied to that cluster&apos;s payout.
+                </p>
+                <p>
+                  • In the base game these marked spots last only for the current tumble sequence; in
+                  Free Spins they persist across spins for the duration of the feature.
                 </p>
               </>
             )}

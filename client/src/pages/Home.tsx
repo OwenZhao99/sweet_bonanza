@@ -11,6 +11,7 @@ import { StatsPanel } from "@/components/StatsPanel";
 import { Paytable } from "@/components/Paytable";
 import { PaytableOlympus } from "@/components/PaytableOlympus";
 import { PaytableFortuneOlympus } from "@/components/PaytableFortuneOlympus";
+import { PaytableSugarRush } from "@/components/PaytableSugarRush";
 import { SpinInfo } from "@/components/SpinInfo";
 import { MathModelModal } from "@/components/MathModelModal";
 import { MathDocModal } from "@/components/MathDocModal";
@@ -66,8 +67,9 @@ export default function Home() {
   const isSweet = activeGameId === "sweet-bonanza-1000";
   const isOlympus = activeGameId === "gates-of-olympus-1000";
   const isFortune = activeGameId === "fortune-of-olympus";
-  const gridCols = isFortune ? 7 : 6;
-  const gridRows = isFortune ? 7 : 5;
+  const isSugar = activeGameId === "sugar-rush-1000";
+  const gridCols = isFortune || isSugar ? 7 : 6;
+  const gridRows = isFortune || isSugar ? 7 : 5;
   const {
     state,
     startSpin,
@@ -126,6 +128,8 @@ export default function Home() {
     droppingPositions,
   } = state;
 
+  const isSweetOrSugar = isSweet || isSugar;
+
   // Keyboard shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -150,20 +154,36 @@ export default function Home() {
   const isActive = phase === "spinning" || phase === "tumbling" || phase === "bonus_trigger"
     || phase === "free_spins" || phase === "free_spins_spinning";
   const isAutoSpinning = autoSpinRemaining > 0;
-  const effectiveBet = isFortune ? bet * FORTUNE_BET_MULTIPLIERS[fortuneBetMode] : anteBetMode !== "none" ? bet * 1.25 : bet;
+  const effectiveBet = isFortune
+    ? bet * FORTUNE_BET_MULTIPLIERS[fortuneBetMode]
+    : anteBetMode !== "none" && !isSugar
+    ? bet * 1.25
+    : bet;
   const canSpin = !isActive && !isFreeSpins && !isAutoSpinning && balance >= effectiveBet;
   const canAutoSpin = !isActive && !isFreeSpins && !isAutoSpinning && balance >= effectiveBet;
-  const buyFSCost = (isSweet ? BUY_FREE_SPINS_COST : isOlympus ? OLYMPUS_BUY_FREE_SPINS_COST : FORTUNE_BUY_FREE_SPINS_COST) * (isFortune ? effectiveBet : bet);
-  const buySFSCost = (isSweet ? BUY_SUPER_FREE_SPINS_COST : FORTUNE_BUY_SUPER_FREE_SPINS_COST) * (isFortune ? effectiveBet : bet);
+  const buyFSCost =
+    (isSweetOrSugar ? BUY_FREE_SPINS_COST : isOlympus ? OLYMPUS_BUY_FREE_SPINS_COST : FORTUNE_BUY_FREE_SPINS_COST) *
+    (isFortune ? effectiveBet : bet);
+  const buySFSCost =
+    (isSweetOrSugar ? BUY_SUPER_FREE_SPINS_COST : FORTUNE_BUY_SUPER_FREE_SPINS_COST) *
+    (isFortune ? effectiveBet : bet);
   const fortuneIsSuper = isFortune && (fortuneBetMode === "super1" || fortuneBetMode === "super2");
 
-  const gameTitle = isSweet ? "Sweet Bonanza 1000" : isOlympus ? "Gates of Olympus 1000" : "Fortune of Olympus";
+  const gameTitle = isSweet
+    ? "Sweet Bonanza 1000"
+    : isOlympus
+    ? "Gates of Olympus 1000"
+    : isFortune
+    ? "Fortune of Olympus"
+    : "Sugar Rush 1000";
   const gameLink = isSweet
     ? "https://www.pragmaticplay.com/en/games/sweet-bonanza-1000/"
     : isOlympus
     ? "https://www.pragmaticplay.com/en/games/gates-of-olympus-1000/"
-    : "https://www.pragmaticplay.com/en/games/fortune-of-olympus/";
-  const gameMaxWinText = isSweet ? "25,000x" : isOlympus ? "15,000x" : "10,000x";
+    : isFortune
+    ? "https://www.pragmaticplay.com/en/games/fortune-of-olympus/"
+    : "https://www.pragmaticplay.com/en/games/sugar-rush-1000/";
+  const gameMaxWinText = isSweetOrSugar ? "25,000x" : isOlympus ? "15,000x" : "10,000x";
 
   const autoSpinProgress = autoSpinTotal > 0
     ? ((autoSpinTotal - autoSpinRemaining) / autoSpinTotal) * 100
@@ -702,7 +722,15 @@ export default function Home() {
                 />
               )}
               {rightPanel === "paytable" && (
-                isSweet ? <Paytable /> : isOlympus ? <PaytableOlympus /> : <PaytableFortuneOlympus />
+                isSweet ? (
+                  <Paytable />
+                ) : isOlympus ? (
+                  <PaytableOlympus />
+                ) : isFortune ? (
+                  <PaytableFortuneOlympus />
+                ) : (
+                  <PaytableSugarRush />
+                )
               )}
               {rightPanel === "rulesRtp" && (
                 <GameRulesRtpPanel
