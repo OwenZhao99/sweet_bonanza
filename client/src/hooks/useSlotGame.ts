@@ -180,6 +180,9 @@ export interface GameState {
 
 const DEFAULT_BET = 1;
 const DEFAULT_BALANCE = 100000;
+// For Sweet Bonanza 1000 Buy Free Spins: model as a fixed 4-scatter trigger
+// with scatter payout equal to the 4-scatter pay (2.4× bet) from the paytable.
+const SWEET_BUY_SCATTER_PAYOUT_MULTIPLIER = 2.4;
 
 function getGridSize(gameId: GameId): number {
   if (gameId === "gates-of-olympus-1000") return Olympus.GRID_SIZE;
@@ -1684,7 +1687,12 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
       const current = stateRef.current;
       const activeIsOlympus = current.gameId === "gates-of-olympus-1000";
       const activeIsFortune = current.gameId === "fortune-of-olympus";
+      const activeIsSugar = current.gameId === "sugar-rush-1000";
+      const activeIsSweet = !activeIsOlympus && !activeIsFortune && !activeIsSugar;
       const effectiveBet = getEffectiveBet(current);
+      const isFastAuto =
+        current.autoSpinFastMode && current.autoSpinRemaining > 0;
+      const anim = current.animationsEnabled && !isFastAuto;
 
       if (activeIsFortune && (current.fortuneBetMode === "super1" || current.fortuneBetMode === "super2")) {
         updateState((prev) => ({ ...prev, message: "Buy Feature is disabled in Super Spin modes" }));
@@ -1694,6 +1702,8 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
         ? Olympus.BUY_FREE_SPINS_COST * current.bet
         : activeIsFortune
         ? (superFreeSpins ? Fortune.BUY_SUPER_FREE_SPINS_COST : Fortune.BUY_FREE_SPINS_COST) * effectiveBet
+        : activeIsSugar
+        ? (superFreeSpins ? Sugar.BUY_SUPER_FREE_SPINS_COST : Sugar.BUY_FREE_SPINS_COST) * current.bet
         : (superFreeSpins ? BUY_SUPER_FREE_SPINS_COST : BUY_FREE_SPINS_COST) * current.bet;
 
       if (current.balance < cost) {
@@ -1701,48 +1711,305 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
         return;
       }
 
-      const fortuneBuyScatterCount = activeIsFortune ? Fortune.buyFreeSpinsTriggerGrid(current.fortuneBetMode).scatterCount : 0;
-      const fortuneFsBase = activeIsFortune ? Fortune.freeSpinsForScatterCount(fortuneBuyScatterCount) : 0;
-      const fortuneFeatureMin = activeIsFortune
-        ? superFreeSpins || current.fortuneBetMode === "ante2"
-          ? 5
-          : 2
-        : 2;
+      // ---- Sweet Bonanza 1000: explicit 4-scatter trigger spin, then start FS ----
+      if (activeIsSweet) {
+        // Scatter payout multiplier uses the same scaling as a natural 4-scatter trigger:
+        // 2.4 (help-screen value) × current RTP multiplier.
+        const scatterMultiplier = SWEET_BUY_SCATTER_PAYOUT_MULTIPLIER * getRtpMultiplier();
 
+        // Step 1: deduct Buy cost and start a short "buy spin" animation.
+        updateState((prev) => ({
+          ...prev,
+          balance: prev.balance - cost,
+          phase: "spinning",
+          isFreeSpins: false,
+          isSuperFreeSpins: superFreeSpins,
+          winPositions: [],
+          currentWinSymbol: null,
+          currentTumbleIndex: -1,
+          currentTumbleStep: null,
+          message: "Buying Free Spins...",
+        }));
+
+        // Step 2: after a brief delay, show a synthetic 4-scatter grid and mark the trigger.
+        timerRef.current = setTimeout(() => {
+          const size = SWEET_GRID_SIZE;
+          const prevState = stateRef.current;
+          const baseGrid = (prevState.grid.length === size
+            ? [...(prevState.grid as SweetGridCell[])]
+            : Array(size).fill(null)) as SweetGridCell[];
+
+          // Clear any existing scatters, then place exactly 4 scatters at random positions.
+          for (let i = 0; i < baseGrid.length; i++) {
+            if (baseGrid[i] === "scatter") baseGrid[i] = null;
+          }
+          const used = new Set<number>();
+          while (used.size < 4 && used.size < baseGrid.length) {
+            const idx = Math.floor(Math.random() * baseGrid.length);
+            if (used.has(idx)) continue;
+            baseGrid[idx] = "scatter";
+            used.add(idx);
+          }
+
+          const emptyMultipliers = Array(size).fill(null) as (
+            | SweetMultiplierCell
+            | OlympusMultiplierCell
+            | FortuneMultiplierCell
+            | SugarMultiplierSpotCell
+            | null
+          )[];
+
+          updateState((prev) => ({
+            ...prev,
+            grid: baseGrid,
+            multipliers: emptyMultipliers,
+            phase: "bonus_trigger",
+            lastScatterCount: 4,
+            // lastScatterPayout is expressed as ×bet (not currency) for SpinInfo.
+            lastScatterPayout: scatterMultiplier,
+            message: `🍭 × 4 — Free Spins triggered!`,
+          }));
+
+          // Step 3: after showing the trigger, start Free Spins.
+          timerRef.current = setTimeout(() => {
+            // This will credit the scatter payout and initialize the FS round.
+            startFreeSpins(4, scatterMultiplier, superFreeSpins);
+            // For Buy FS, Sweet uses an "across_spins" multiplier meter during the feature.
+            updateState((prev) => ({
+              ...prev,
+              freeSpinsMeterMode: "across_spins",
+            }));
+          }, anim ? 800 : 0);
+        }, anim ? 300 : 0);
+
+        return;
+      }
+
+      // ---- Gates of Olympus 1000: explicit 4-scatter trigger spin, then start FS ----
+      if (activeIsOlympus) {
+        const scatterMultiplier = 3; // 4 scatters pay 3× bet in the Olympus helper
+
+        // Step 1: deduct Buy cost and show a short "buy spin" state.
+        updateState((prev) => ({
+          ...prev,
+          balance: prev.balance - cost,
+          phase: "spinning",
+          isFreeSpins: false,
+          isSuperFreeSpins: false,
+          winPositions: [],
+          currentWinSymbol: null,
+          currentTumbleIndex: -1,
+          currentTumbleStep: null,
+          message: "Buying Free Spins (Olympus)...",
+        }));
+
+        // Step 2: show a synthetic 4-scatter trigger grid.
+        timerRef.current = setTimeout(() => {
+          const size = Olympus.GRID_SIZE;
+          const prevState = stateRef.current;
+          const baseGrid = (prevState.grid.length === size
+            ? [...(prevState.grid as OlympusGridCell[])]
+            : Array(size).fill(null)) as OlympusGridCell[];
+
+          for (let i = 0; i < baseGrid.length; i++) {
+            if (baseGrid[i] === "scatter") baseGrid[i] = null;
+          }
+          const used = new Set<number>();
+          while (used.size < 4 && used.size < baseGrid.length) {
+            const idx = Math.floor(Math.random() * baseGrid.length);
+            if (used.has(idx)) continue;
+            baseGrid[idx] = "scatter";
+            used.add(idx);
+          }
+
+          const emptyMultipliers = Array(size).fill(null) as (
+            | SweetMultiplierCell
+            | OlympusMultiplierCell
+            | FortuneMultiplierCell
+            | SugarMultiplierSpotCell
+            | null
+          )[];
+
+          updateState((prev) => ({
+            ...prev,
+            grid: baseGrid,
+            multipliers: emptyMultipliers,
+            phase: "bonus_trigger",
+            lastScatterCount: 4,
+            // For display only (×bet); Olympus credits this at FS end via freeSpinsTotalWin.
+            lastScatterPayout: scatterMultiplier,
+            message: `⚡ × 4 — Free Spins triggered!`,
+          }));
+
+          // Step 3: after showing the trigger, initialize the FS round.
+          timerRef.current = setTimeout(() => {
+            updateState((prev) => ({
+              ...prev,
+              phase: "free_spins",
+              isFreeSpins: true,
+              isSuperFreeSpins: false,
+              freeSpinsRemaining: Olympus.FREE_SPINS_BASE,
+              freeSpinsTotal: Olympus.FREE_SPINS_BASE,
+              // Start FS total with the 3× trigger payout; credited at FS end.
+              freeSpinsTotalWin: 3 * current.bet,
+              featureMultiplierMeter: 0,
+              currentMultiplierTotal: 0,
+              freeSpinsMeterMode: "per_spin",
+              message: `Free Spins started! ${Olympus.FREE_SPINS_BASE} spins`,
+            }));
+
+            timerRef.current = setTimeout(() => {
+              doSpin(true, false);
+            }, anim ? 300 : 0);
+          }, anim ? 800 : 0);
+        }, anim ? 300 : 0);
+
+        return;
+      }
+
+      // ---- Fortune of Olympus: explicit 4-scatter trigger spin, then start FS ----
+      if (activeIsFortune) {
+        updateState((prev) => ({
+          ...prev,
+          balance: prev.balance - cost,
+          phase: "spinning",
+          isFreeSpins: false,
+          isSuperFreeSpins: false,
+          winPositions: [],
+          currentWinSymbol: null,
+          currentTumbleIndex: -1,
+          currentTumbleStep: null,
+          message: "Buying Free Spins (Fortune)...",
+        }));
+
+        timerRef.current = setTimeout(() => {
+          const size = Fortune.GRID_SIZE;
+          const prevState = stateRef.current;
+          const baseGrid = (prevState.grid.length === size
+            ? [...(prevState.grid as FortuneGridCell[])]
+            : Array(size).fill(null)) as FortuneGridCell[];
+
+          for (let i = 0; i < baseGrid.length; i++) {
+            if (baseGrid[i] === "scatter") baseGrid[i] = null;
+          }
+          const used = new Set<number>();
+          while (used.size < 4 && used.size < baseGrid.length) {
+            const idx = Math.floor(Math.random() * baseGrid.length);
+            if (used.has(idx)) continue;
+            baseGrid[idx] = "scatter";
+            used.add(idx);
+          }
+
+          const emptyMultipliers = Array(size).fill(null) as (
+            | SweetMultiplierCell
+            | OlympusMultiplierCell
+            | FortuneMultiplierCell
+            | SugarMultiplierSpotCell
+            | null
+          )[];
+
+          updateState((prev) => ({
+            ...prev,
+            grid: baseGrid,
+            multipliers: emptyMultipliers,
+            phase: "bonus_trigger",
+            lastScatterCount: 4,
+            lastScatterPayout: 0,
+            message: `🧙 × 4 — Free Spins triggered!`,
+          }));
+
+          timerRef.current = setTimeout(() => {
+            // Fortune: scatter determines FS count; no scatter payout.
+            startFreeSpins(4, 0, false);
+          }, anim ? 800 : 0);
+        }, anim ? 300 : 0);
+
+        return;
+      }
+
+      // ---- Sugar Rush 1000: explicit 4-scatter trigger spin, then start FS ----
+      if (activeIsSugar) {
+        updateState((prev) => ({
+          ...prev,
+          balance: prev.balance - cost,
+          phase: "spinning",
+          isFreeSpins: false,
+          isSuperFreeSpins: superFreeSpins,
+          winPositions: [],
+          currentWinSymbol: null,
+          currentTumbleIndex: -1,
+          currentTumbleStep: null,
+          message: "Buying Free Spins (Sugar)...",
+        }));
+
+        timerRef.current = setTimeout(() => {
+          const size = Sugar.GRID_SIZE;
+          const prevState = stateRef.current;
+          const baseGrid = (prevState.grid.length === size
+            ? [...(prevState.grid as SugarGridCell[])]
+            : Array(size).fill(null)) as SugarGridCell[];
+
+          for (let i = 0; i < baseGrid.length; i++) {
+            if (baseGrid[i] === "scatter") baseGrid[i] = null;
+          }
+          const used = new Set<number>();
+          while (used.size < 4 && used.size < baseGrid.length) {
+            const idx = Math.floor(Math.random() * baseGrid.length);
+            if (used.has(idx)) continue;
+            baseGrid[idx] = "scatter";
+            used.add(idx);
+          }
+
+          const emptyMultipliers = Array(size).fill(null) as (
+            | SweetMultiplierCell
+            | OlympusMultiplierCell
+            | FortuneMultiplierCell
+            | SugarMultiplierSpotCell
+            | null
+          )[];
+
+          updateState((prev) => ({
+            ...prev,
+            grid: baseGrid,
+            multipliers: emptyMultipliers,
+            phase: "bonus_trigger",
+            lastScatterCount: 4,
+            lastScatterPayout: 0,
+            message: `🥚 × 4 — Free Spins triggered!`,
+          }));
+
+          timerRef.current = setTimeout(() => {
+            // Sugar: 4 scatters guarantee a fixed FS count; no direct scatter payout.
+            startFreeSpins(4, 0, superFreeSpins);
+          }, anim ? 800 : 0);
+        }, anim ? 300 : 0);
+
+        return;
+      }
+
+      // ---- Fallback (currently unused) ----
+
+      // Fallback: for any future games, just deduct cost and start a generic FS round.
       updateState((prev) => ({
         ...prev,
         balance: prev.balance - cost,
         phase: "free_spins",
         isFreeSpins: true,
-        isSuperFreeSpins: activeIsOlympus ? false : superFreeSpins,
-        freeSpinsRemaining: activeIsOlympus
-          ? Olympus.FREE_SPINS_BASE
-          : activeIsFortune
-          ? fortuneFsBase
-          : FREE_SPINS_BASE,
-        freeSpinsTotal: activeIsOlympus
-          ? Olympus.FREE_SPINS_BASE
-          : activeIsFortune
-          ? fortuneFsBase
-          : FREE_SPINS_BASE,
-        // Olympus buy feature guarantees 4 scatters (3x payout) on trigger; credit at round end.
-        freeSpinsTotalWin: activeIsOlympus ? 3 * current.bet : 0,
+        isSuperFreeSpins: superFreeSpins,
+        freeSpinsRemaining: FREE_SPINS_BASE,
+        freeSpinsTotal: FREE_SPINS_BASE,
+        freeSpinsTotalWin: 0,
         featureMultiplierMeter: 0,
         currentMultiplierTotal: 0,
         freeSpinsMeterMode: "across_spins",
-        fortuneFeatureMinMultiplierValue: activeIsFortune ? fortuneFeatureMin : prev.fortuneFeatureMinMultiplierValue,
-        message: activeIsOlympus
-          ? "Bought Free Spins!"
-          : activeIsFortune
-          ? `Bought ${superFreeSpins ? "Super " : ""}Free Spins! (🧙×${fortuneBuyScatterCount})`
-          : `Bought ${superFreeSpins ? "Super " : ""}Free Spins!`,
+        message: `Bought ${superFreeSpins ? "Super " : ""}Free Spins!`,
       }));
 
       timerRef.current = setTimeout(() => {
-        doSpin(true, activeIsOlympus ? false : superFreeSpins);
+        doSpin(true, superFreeSpins);
       }, 300);
     },
-    [updateState, doSpin]
+    [updateState, doSpin, startFreeSpins]
   );
 
   const endFreeSpins = useCallback(() => {
