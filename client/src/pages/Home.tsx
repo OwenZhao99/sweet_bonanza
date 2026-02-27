@@ -41,8 +41,21 @@ const VOLATILITY_OPTIONS: { value: VolatilityLevel; label: string; color: string
 
 // CSV download helper
 function downloadCSV(records: SpinRecord[]) {
-  const headers = ["#", "Spin", "Bet", "Win", "Multiplier", "Tumbles", "Free Spins Triggered", "Timestamp"];
-  const rows = records.map(r => [
+  const headers = [
+    "#",
+    "Spin",
+    "Bet",
+    "Win",
+    "Multiplier",
+    "Tumbles",
+    "Free Spins Triggered",
+    "Best Symbol",
+    "Best Symbol Count",
+    "Best Line Multiplier",
+    "Has Streak",
+    "Timestamp",
+  ];
+  const rows = records.map((r) => [
     r.id,
     r.spinNumber,
     r.bet.toFixed(2),
@@ -50,9 +63,13 @@ function downloadCSV(records: SpinRecord[]) {
     r.multiplier.toFixed(2),
     r.tumbles,
     r.triggeredFS ? "Yes" : "No",
+    r.bestSymbolId ?? "",
+    r.bestSymbolCount ?? "",
+    r.bestSymbolMultiplier != null ? r.bestSymbolMultiplier.toFixed(2) : "",
+    r.hasStreak ? "Yes" : "No",
     new Date(r.timestamp).toISOString(),
   ]);
-  const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
+  const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -88,6 +105,7 @@ export default function Home() {
     setVolatilityLevel,
     getVolatility,
     clearHistory,
+    setAutoSpinFastMode,
   } = useSlotGame(activeGameId);
 
   const [rightPanel, setRightPanel] = useState<RightPanel>("stats");
@@ -126,6 +144,7 @@ export default function Home() {
     animationsEnabled,
     spinHistory,
     droppingPositions,
+    autoSpinFastMode,
   } = state;
 
   const isSweetOrSugar = isSweet || isSugar;
@@ -145,11 +164,17 @@ export default function Home() {
   // Auto-close free spins end screen
   useEffect(() => {
     if (phase === "free_spins_end") {
-      const delay = animationsEnabled ? 5000 : 1500;
+      // 在自动旋转时，免费旋转结束弹窗应立即略过以不中断自动旋转
+      const delay =
+        autoSpinRemaining > 0
+          ? 0
+          : animationsEnabled
+          ? 5000
+          : 1500;
       const timer = setTimeout(() => endFreeSpins(), delay);
       return () => clearTimeout(timer);
     }
-  }, [phase, endFreeSpins, animationsEnabled]);
+  }, [phase, endFreeSpins, animationsEnabled, autoSpinRemaining]);
 
   const isActive = phase === "spinning" || phase === "tumbling" || phase === "bonus_trigger"
     || phase === "free_spins" || phase === "free_spins_spinning";
@@ -434,7 +459,7 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="flex gap-1">
+          <div className="flex gap-1">
               <input
                 type="number"
                 min={1}
@@ -472,6 +497,17 @@ export default function Home() {
                 </button>
               )}
             </div>
+
+            <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-500">
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 rounded border-slate-300"
+                checked={autoSpinFastMode}
+                onChange={(e) => setAutoSpinFastMode(e.target.checked)}
+                disabled={isAutoSpinning}
+              />
+              <span>Super fast auto spin</span>
+            </label>
 
             {isAutoSpinning && (
               <div className="space-y-0.5">
@@ -814,6 +850,24 @@ interface HistoryPanelProps {
   onDownload: () => void;
 }
 
+function formatSpinReason(r: SpinRecord): string {
+  if (r.win <= 0) return "—";
+
+  const parts: string[] = [];
+
+  if (r.bestSymbolCount && r.bestSymbolId) {
+    parts.push(`${r.bestSymbolCount}×${r.bestSymbolId}`);
+  }
+  if (r.bestSymbolMultiplier && r.bestSymbolMultiplier > 0) {
+    parts.push(`${r.bestSymbolMultiplier.toFixed(1)}x`);
+  }
+  if (r.hasStreak && r.tumbles > 1) {
+    parts.push(`${r.tumbles} tumbles`);
+  }
+
+  return parts.length ? parts.join(" / ") : "—";
+}
+
 const HistoryPanel: React.FC<HistoryPanelProps> = ({ records, onClear, onDownload }) => {
   return (
     <div className="flex flex-col h-full gap-2">
@@ -890,18 +944,19 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ records, onClear, onDownloa
       ) : (
         <div className="flex-1 overflow-y-auto space-y-0.5">
           {/* Header row */}
-          <div className="grid grid-cols-5 gap-1.5 px-2 py-1.5 text-xs text-slate-400 uppercase tracking-wide sticky top-0 bg-white border-b border-slate-100">
+          <div className="grid grid-cols-6 gap-1.5 px-2 py-1.5 text-xs text-slate-400 uppercase tracking-wide sticky top-0 bg-white border-b border-slate-100">
             <span>#</span>
             <span className="text-right">Bet</span>
             <span className="text-right">Win</span>
             <span className="text-right">Mult</span>
             <span className="text-right">Tumbles</span>
+            <span className="text-right">Reason</span>
           </div>
           {records.map((r) => (
             <div
               key={r.id}
               className={cn(
-                "grid grid-cols-5 gap-1.5 px-2 py-1.5 rounded text-xs transition-colors",
+                "grid grid-cols-6 gap-1.5 px-2 py-1.5 rounded text-xs transition-colors",
                 r.triggeredFS
                   ? "bg-yellow-50 border border-yellow-200"
                   : r.win > 0
@@ -928,6 +983,9 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ records, onClear, onDownloa
                 {r.tumbles > 0 ? r.tumbles : "—"}
                 {r.triggeredFS && <span className="ml-0.5 text-yellow-600">⭐</span>}
               </span>
+                <span className="text-right font-mono text-slate-500">
+                  {formatSpinReason(r)}
+                </span>
             </div>
           ))}
         </div>

@@ -32,6 +32,7 @@ interface GameControlsProps {
   freeSpinsRemaining: number;
   autoSpinRemaining: number;
   autoSpinTotal: number;
+  autoSpinFastMode: boolean;
   animationsEnabled: boolean;
   currentTargetRtp: number;
   onSpin: () => void;
@@ -45,6 +46,7 @@ interface GameControlsProps {
   onAddBalance: (amount: number) => void;
   onReset: () => void;
   onSetTargetRtp: (rtp: number) => void;
+   onSetAutoSpinFastMode: (enabled: boolean) => void;
 }
 
 export const GameControls: React.FC<GameControlsProps> = ({
@@ -58,6 +60,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
   freeSpinsRemaining,
   autoSpinRemaining,
   autoSpinTotal,
+  autoSpinFastMode,
   animationsEnabled,
   currentTargetRtp,
   onSpin,
@@ -71,6 +74,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
   onAddBalance,
   onReset,
   onSetTargetRtp,
+  onSetAutoSpinFastMode,
 }) => {
   const [autoSpinInput, setAutoSpinInput] = useState<string>("100");
   const [rtpInput, setRtpInput] = useState<string>(String(currentTargetRtp.toFixed(1)));
@@ -293,6 +297,17 @@ export const GameControls: React.FC<GameControlsProps> = ({
             </button>
           )}
         </div>
+
+        <label className="flex items-center gap-1 text-[10px] text-slate-400">
+          <input
+            type="checkbox"
+            className="h-3 w-3 rounded border-slate-600"
+            checked={autoSpinFastMode}
+            onChange={(e) => onSetAutoSpinFastMode(e.target.checked)}
+            disabled={isAutoSpinning}
+          />
+          <span>Super fast auto spin</span>
+        </label>
 
         {/* Auto spin progress bar */}
         {isAutoSpinning && (

@@ -81,6 +81,36 @@ export interface SpinRecord {
   triggeredFS: boolean;
   isFreeSpins: boolean;
   timestamp: number;
+  bestSymbolId?: string;
+  bestSymbolCount?: number;
+  bestSymbolMultiplier?: number;
+  hasStreak?: boolean;
+}
+
+type AnyTumbleStep =
+  | SweetTumbleStep
+  | OlympusTumbleStep
+  | FortuneTumbleStep
+  | SugarTumbleStep;
+
+function extractWinDetails(steps: AnyTumbleStep[]) {
+  let bestSymbolId: string | undefined;
+  let bestSymbolCount = 0;
+  let bestSymbolMultiplier = 0;
+
+  for (const step of steps) {
+    for (const win of step.wins) {
+      if (win.payout > bestSymbolMultiplier) {
+        bestSymbolMultiplier = win.payout;
+        bestSymbolId = win.symbolId;
+        bestSymbolCount = win.count;
+      }
+    }
+  }
+
+  const hasStreak = steps.length > 1;
+
+  return { bestSymbolId, bestSymbolCount, bestSymbolMultiplier, hasStreak };
 }
 
 export interface GameState {
@@ -144,6 +174,8 @@ export interface GameState {
   totalSpinCounter: number;
   // Positions of newly dropped symbols (for drop animation)
   droppingPositions: number[];
+  // Whether auto spin should run in "super fast" (no animation, skip tumble steps) mode
+  autoSpinFastMode: boolean;
 }
 
 const DEFAULT_BET = 1;
@@ -204,6 +236,7 @@ function createInitialState(gameId: GameId): GameState {
     spinHistory: [],
     totalSpinCounter: 0,
     droppingPositions: [],
+    autoSpinFastMode: false,
   };
 }
 
@@ -265,7 +298,9 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
       currentStats: GameStats
     ) => {
       const steps = spinResult.tumbleSteps;
-      const anim = stateRef.current.animationsEnabled;
+      const isFastAuto =
+        stateRef.current.autoSpinFastMode && stateRef.current.autoSpinRemaining > 0;
+      const anim = stateRef.current.animationsEnabled && !isFastAuto;
       const activeIsOlympus = stateRef.current.gameId === "gates-of-olympus-1000";
       const activeIsFortune = stateRef.current.gameId === "fortune-of-olympus";
       const activeIsSugar = stateRef.current.gameId === "sugar-rush-1000";
@@ -363,9 +398,8 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
       let stepIndex = 0;
       let cumulativeWin = 0;
 
-      const playNextStep = () => {
-        if (stepIndex >= steps.length) {
-          if (activeIsOlympus) {
+      const finishSequence = () => {
+        if (activeIsOlympus) {
             const olympusSpin = spinResult as OlympusFullSpinResult;
             const finalMultiplierSum = olympusSpin.finalMultiplierSum || 0;
 
@@ -488,6 +522,8 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
               }
             } else {
               const spinNum = stateRef.current.totalSpinCounter;
+              const { bestSymbolId, bestSymbolCount, bestSymbolMultiplier, hasStreak } =
+                extractWinDetails(steps as AnyTumbleStep[]);
               const record: SpinRecord = {
                 id: Date.now() + Math.random(),
                 spinNumber: spinNum,
@@ -498,6 +534,10 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                 triggeredFS: spinResult.triggersBonus,
                 isFreeSpins: false,
                 timestamp: Date.now(),
+                bestSymbolId,
+                bestSymbolCount,
+                bestSymbolMultiplier,
+                hasStreak,
               };
 
               updateState((prev) => ({
@@ -521,10 +561,10 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
               }));
               scheduleNextAutoSpin(betAmount);
             }
-            return;
-          }
+          return;
+        }
 
-          if (activeIsFortune) {
+        if (activeIsFortune) {
             const fortuneSpin = spinResult as FortuneFullSpinResult;
             const finalMultiplierSum = fortuneSpin.finalMultiplierSum || 0;
 
@@ -648,6 +688,8 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
               }
             } else {
               const spinNum = stateRef.current.totalSpinCounter;
+              const { bestSymbolId, bestSymbolCount, bestSymbolMultiplier, hasStreak } =
+                extractWinDetails(steps as AnyTumbleStep[]);
               const record: SpinRecord = {
                 id: Date.now() + Math.random(),
                 spinNumber: spinNum,
@@ -658,6 +700,10 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                 triggeredFS: spinResult.triggersBonus,
                 isFreeSpins: false,
                 timestamp: Date.now(),
+                bestSymbolId,
+                bestSymbolCount,
+                bestSymbolMultiplier,
+                hasStreak,
               };
 
               updateState((prev) => ({
@@ -682,10 +728,10 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
               }));
               scheduleNextAutoSpin(betAmount);
             }
-            return;
-          }
+          return;
+        }
 
-          if (activeIsSugar) {
+        if (activeIsSugar) {
             const sugarSpin = spinResult as SugarFullSpinResult;
             const finalWinMultiplier = sugarSpin.totalPayout;
             const totalWin = finalWinMultiplier * betAmount;
@@ -782,6 +828,8 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
               }
             } else {
               const spinNum = stateRef.current.totalSpinCounter;
+              const { bestSymbolId, bestSymbolCount, bestSymbolMultiplier, hasStreak } =
+                extractWinDetails(steps as AnyTumbleStep[]);
               const record: SpinRecord = {
                 id: Date.now() + Math.random(),
                 spinNumber: spinNum,
@@ -792,6 +840,10 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
                 triggeredFS: sugarSpin.triggersBonus,
                 isFreeSpins: false,
                 timestamp: Date.now(),
+                bestSymbolId,
+                bestSymbolCount,
+                bestSymbolMultiplier,
+                hasStreak,
               };
 
               updateState((prev) => ({
@@ -817,201 +869,220 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
               }));
               scheduleNextAutoSpin(betAmount);
             }
-            return;
-          }
+          return;
+        }
 
-          // === Sweet settlement ===
-          const meterMode = stateRef.current.freeSpinsMeterMode;
-          const meterBefore = stateRef.current.featureMultiplierMeter || 0;
-          const hasWin = cumulativeWin > 0;
-          let nextMeter = meterBefore;
-          let displayMultiplierTotal = 0;
+        // === Sweet settlement ===
+        const meterMode = stateRef.current.freeSpinsMeterMode;
+        const meterBefore = stateRef.current.featureMultiplierMeter || 0;
+        const hasWin = cumulativeWin > 0;
+        let nextMeter = meterBefore;
+        let displayMultiplierTotal = 0;
 
-          // In free spins, apply multiplier at end of tumble sequence.
-          // - per_spin: use this spin's multiplier sum, then reset
-          // - across_spins (Buy FS): accumulate across spins and use meter even if this spin has no new multipliers
-          if (isFreeSpins && steps.length > 0 && hasWin) {
-            const spinMultiplierSum = (steps[steps.length - 1] as SweetTumbleStep).multiplierTotal || 0;
-            if (meterMode === "across_spins") {
-              nextMeter = meterBefore + spinMultiplierSum;
-              const effective = nextMeter > 0 ? nextMeter : 1;
-              cumulativeWin *= effective;
-              displayMultiplierTotal = nextMeter;
-            } else {
-              const effective = spinMultiplierSum > 0 ? spinMultiplierSum : 1;
-              cumulativeWin *= effective;
-              nextMeter = 0;
-              displayMultiplierTotal = spinMultiplierSum;
-            }
-          } else if (isFreeSpins) {
-            // No win on this spin: meter persists only for across_spins mode
-            nextMeter = meterMode === "across_spins" ? meterBefore : 0;
-            displayMultiplierTotal = meterMode === "across_spins" ? meterBefore : 0;
-          }
-          const totalWin = cumulativeWin * betAmount;
-          // In free spins, don't count bet or spins (already counted in the triggering spin)
-          const statsBet = isFreeSpins ? 0 : betAmount;
-          const newStats = updateStats(
-            currentStats,
-            statsBet,
-            cumulativeWin,
-            steps.length,
-            spinResult.triggersBonus,
-            isFreeSpins,
-            betAmount
-          );
-
-          // In animation mode, balance was already added step-by-step (base payout only).
-          // In turbo mode, add full totalWin at once.
-          // For FS with multiplier: animation mode already added base payouts step-by-step,
-          // so we need to add the multiplier bonus (totalWin - basePayout*betAmount).
-          const basePayout = steps.reduce((sum, s) => sum + s.payout, 0);
-          const baseWinAmount = basePayout * betAmount;
-          const multiplierBonus = totalWin - baseWinAmount; // extra from multiplier
-          const shouldAddBalance = !anim;
-          const animMultiplierBonus = anim && isFreeSpins && multiplierBonus > 0 ? multiplierBonus : 0;
-
-          if (isFreeSpins) {
-            const MAX_WIN_CAP = 25000; // 25,000x bet max win
-            let newTotalWin = currentFreeSpinsTotalWin + totalWin;
-            let newRemaining = currentFreeSpinsRemaining - 1;
-
-            const retriggered = spinResult.scatterCount >= RETRIGGER_SCATTER;
-            if (retriggered) {
-              newRemaining += FREE_SPINS_RETRIGGER;
-            }
-
-            // Max win cap: if total FS win reaches 25,000x bet, end immediately
-            const totalWinMultiplier = newTotalWin / betAmount;
-            if (totalWinMultiplier >= MAX_WIN_CAP) {
-              newTotalWin = MAX_WIN_CAP * betAmount;
-              newRemaining = 0; // force end
-            }
-
-            if (newRemaining <= 0) {
-              updateState((prev) => ({
-                ...prev,
-                phase: "free_spins_end",
-                // Ensure UI reflects final post-tumble state for this spin (important in turbo mode)
-                grid: spinResult.finalGrid,
-                multipliers: spinResult.finalMultipliers,
-                winPositions: [],
-                currentWinSymbol: null,
-                balance: shouldAddBalance ? prev.balance + totalWin : prev.balance + animMultiplierBonus,
-                freeSpinsRemaining: 0,
-                freeSpinsTotalWin: newTotalWin,
-                spinWin: totalWin,
-                spinWinMultiplier: cumulativeWin,
-                stats: newStats,
-                featureMultiplierMeter: meterMode === "across_spins" ? nextMeter : 0,
-                currentMultiplierTotal: meterMode === "across_spins" ? nextMeter : displayMultiplierTotal,
-                message: `Free Spins ended! Total win: ${newTotalWin.toFixed(2)}`,
-              }));
-            } else {
-              const retriggerMsg = retriggered
-                ? `Retriggered! +${FREE_SPINS_RETRIGGER} spins! ${newRemaining} remaining`
-                : `${newRemaining} free spins remaining`;
-              updateState((prev) => ({
-                ...prev,
-                phase: "free_spins_spinning",
-                // Ensure UI reflects final post-tumble state for this spin (important in turbo mode)
-                grid: spinResult.finalGrid,
-                multipliers: spinResult.finalMultipliers,
-                winPositions: [],
-                currentWinSymbol: null,
-                balance: shouldAddBalance ? prev.balance + totalWin : prev.balance + animMultiplierBonus,
-                freeSpinsRemaining: newRemaining,
-                freeSpinsTotalWin: newTotalWin,
-                spinWin: totalWin,
-                spinWinMultiplier: cumulativeWin,
-                stats: newStats,
-                featureMultiplierMeter: meterMode === "across_spins" ? nextMeter : 0,
-                currentMultiplierTotal: meterMode === "across_spins" ? nextMeter : displayMultiplierTotal,
-                message: retriggerMsg,
-              }));
-              timerRef.current = setTimeout(() => {
-                const fsState = stateRef.current;
-                const fsResult = spin(true, fsState.isSuperFreeSpins, false);
-                updateState((prev) => ({
-                  ...prev,
-                  grid: fsResult.initialGrid,
-                  multipliers: fsResult.initialMultipliers,
-                  winPositions: [],
-                  currentSpinResult: fsResult,
-                  lastScatterCount: fsResult.scatterCount,
-                  message: `Free spinning... ${newRemaining} left`,
-                }));
-                runTumbleSequence(
-                  fsResult,
-                  betAmount,
-                  true,
-                  newRemaining,
-                  newTotalWin,
-                  newStats
-                );
-              }, anim ? 800 : 0);
-            }
+        // In free spins, apply multiplier at end of tumble sequence.
+        // - per_spin: use this spin's multiplier sum, then reset
+        // - across_spins (Buy FS): accumulate across spins and use meter even if this spin has no new multipliers
+        if (isFreeSpins && steps.length > 0 && hasWin) {
+          const spinMultiplierSum = (steps[steps.length - 1] as SweetTumbleStep).multiplierTotal || 0;
+          if (meterMode === "across_spins") {
+            nextMeter = meterBefore + spinMultiplierSum;
+            const effective = nextMeter > 0 ? nextMeter : 1;
+            cumulativeWin *= effective;
+            displayMultiplierTotal = nextMeter;
           } else {
-            // Record spin history
-            const spinNum = stateRef.current.totalSpinCounter;
-            const record: SpinRecord = {
-              id: Date.now() + Math.random(),
-              spinNumber: spinNum,
-              bet: betAmount,
-              win: totalWin,
-              multiplier: cumulativeWin,
-              tumbles: steps.length,
-              triggeredFS: spinResult.triggersBonus,
-              isFreeSpins: false,
-              timestamp: Date.now(),
-            };
+            const effective = spinMultiplierSum > 0 ? spinMultiplierSum : 1;
+            cumulativeWin *= effective;
+            nextMeter = 0;
+            displayMultiplierTotal = spinMultiplierSum;
+          }
+        } else if (isFreeSpins) {
+          // No win on this spin: meter persists only for across_spins mode
+          nextMeter = meterMode === "across_spins" ? meterBefore : 0;
+          displayMultiplierTotal = meterMode === "across_spins" ? meterBefore : 0;
+        }
+        const totalWin = cumulativeWin * betAmount;
+        // In free spins, don't count bet or spins (already counted in the triggering spin)
+        const statsBet = isFreeSpins ? 0 : betAmount;
+        const newStats = updateStats(
+          currentStats,
+          statsBet,
+          cumulativeWin,
+          steps.length,
+          spinResult.triggersBonus,
+          isFreeSpins,
+          betAmount
+        );
 
-            // #region agent log
-            const n = newStats.totalSpins;
-            if (n === 1 || n % 100 === 0 || n === 1000) {
-              fetch("http://127.0.0.1:7491/ingest/1ac776a0-99df-4f99-9de6-75896fb8fe70", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a04187" },
-                body: JSON.stringify({
-                  sessionId: "a04187",
-                  runId: "ui-rtp",
-                  hypothesisId: n === 1 ? "H2" : "H3",
-                  location: "useSlotGame.ts:runTumbleSequence",
-                  message: n === 1 ? "First spin RTP config" : `After ${n} spins`,
-                  data: {
-                    totalSpins: newStats.totalSpins,
-                    totalBet: newStats.totalBet,
-                    totalWin: newStats.totalWin,
-                    realRtp: newStats.realRTP,
-                    targetRtp: getTargetRtp(),
-                    rtpMultiplier: getRtpMultiplier(),
-                  },
-                  timestamp: Date.now(),
-                }),
-              }).catch(() => {});
-            }
-            // #endregion
+        // In animation mode, balance was already added step-by-step (base payout only).
+        // In turbo mode, add full totalWin at once.
+        // For FS with multiplier: animation mode already added base payouts step-by-step,
+        // so we need to add the multiplier bonus (totalWin - basePayout*betAmount).
+        const basePayout = steps.reduce((sum, s) => sum + s.payout, 0);
+        const baseWinAmount = basePayout * betAmount;
+        const multiplierBonus = totalWin - baseWinAmount; // extra from multiplier
+        const shouldAddBalance = !anim;
+        const animMultiplierBonus = anim && isFreeSpins && multiplierBonus > 0 ? multiplierBonus : 0;
 
+        if (isFreeSpins) {
+          const MAX_WIN_CAP = 25000; // 25,000x bet max win
+          let newTotalWin = currentFreeSpinsTotalWin + totalWin;
+          let newRemaining = currentFreeSpinsRemaining - 1;
+
+          const retriggered = spinResult.scatterCount >= RETRIGGER_SCATTER;
+          if (retriggered) {
+            newRemaining += FREE_SPINS_RETRIGGER;
+          }
+
+          // Max win cap: if total FS win reaches 25,000x bet, end immediately
+          const totalWinMultiplier = newTotalWin / betAmount;
+          if (totalWinMultiplier >= MAX_WIN_CAP) {
+            newTotalWin = MAX_WIN_CAP * betAmount;
+            newRemaining = 0; // force end
+          }
+
+          if (newRemaining <= 0) {
             updateState((prev) => ({
               ...prev,
-              phase: "idle",
-              // Ensure the UI shows the true post-tumble final state (important in turbo mode)
+              phase: "free_spins_end",
+              // Ensure UI reflects final post-tumble state for this spin (important in turbo mode)
               grid: spinResult.finalGrid,
               multipliers: spinResult.finalMultipliers,
               winPositions: [],
               currentWinSymbol: null,
-              droppingPositions: [],
-              balance: shouldAddBalance ? prev.balance + totalWin : prev.balance,
+              balance: shouldAddBalance ? prev.balance + totalWin : prev.balance + animMultiplierBonus,
+              freeSpinsRemaining: 0,
+              freeSpinsTotalWin: newTotalWin,
               spinWin: totalWin,
               spinWinMultiplier: cumulativeWin,
               stats: newStats,
-              message: totalWin > 0
-                ? `Win: ${totalWin.toFixed(2)} (${cumulativeWin.toFixed(2)}x)`
-                : "No win — try again!",
-              spinHistory: [record, ...prev.spinHistory].slice(0, 1000),
+              featureMultiplierMeter: meterMode === "across_spins" ? nextMeter : 0,
+              currentMultiplierTotal: meterMode === "across_spins" ? nextMeter : displayMultiplierTotal,
+              message: `Free Spins ended! Total win: ${newTotalWin.toFixed(2)}`,
             }));
-            scheduleNextAutoSpin(betAmount);
+          } else {
+            const retriggerMsg = retriggered
+              ? `Retriggered! +${FREE_SPINS_RETRIGGER} spins! ${newRemaining} remaining`
+              : `${newRemaining} free spins remaining`;
+            updateState((prev) => ({
+              ...prev,
+              phase: "free_spins_spinning",
+              // Ensure UI reflects final post-tumble state for this spin (important in turbo mode)
+              grid: spinResult.finalGrid,
+              multipliers: spinResult.finalMultipliers,
+              winPositions: [],
+              currentWinSymbol: null,
+              balance: shouldAddBalance ? prev.balance + totalWin : prev.balance + animMultiplierBonus,
+              freeSpinsRemaining: newRemaining,
+              freeSpinsTotalWin: newTotalWin,
+              spinWin: totalWin,
+              spinWinMultiplier: cumulativeWin,
+              stats: newStats,
+              featureMultiplierMeter: meterMode === "across_spins" ? nextMeter : 0,
+              currentMultiplierTotal: meterMode === "across_spins" ? nextMeter : displayMultiplierTotal,
+              message: retriggerMsg,
+            }));
+            timerRef.current = setTimeout(() => {
+              const fsState = stateRef.current;
+              const fsResult = spin(true, fsState.isSuperFreeSpins, false);
+              updateState((prev) => ({
+                ...prev,
+                grid: fsResult.initialGrid,
+                multipliers: fsResult.initialMultipliers,
+                winPositions: [],
+                currentSpinResult: fsResult,
+                lastScatterCount: fsResult.scatterCount,
+                message: `Free spinning... ${newRemaining} left`,
+              }));
+              runTumbleSequence(
+                fsResult,
+                betAmount,
+                true,
+                newRemaining,
+                newTotalWin,
+                newStats
+              );
+            }, anim ? 800 : 0);
           }
+        } else {
+          // Record spin history
+          const spinNum = stateRef.current.totalSpinCounter;
+          const { bestSymbolId, bestSymbolCount, bestSymbolMultiplier, hasStreak } =
+            extractWinDetails(steps as AnyTumbleStep[]);
+          const record: SpinRecord = {
+            id: Date.now() + Math.random(),
+            spinNumber: spinNum,
+            bet: betAmount,
+            win: totalWin,
+            multiplier: cumulativeWin,
+            tumbles: steps.length,
+            triggeredFS: spinResult.triggersBonus,
+            isFreeSpins: false,
+            timestamp: Date.now(),
+            bestSymbolId,
+            bestSymbolCount,
+            bestSymbolMultiplier,
+            hasStreak,
+          };
+
+          // #region agent log
+          const n = newStats.totalSpins;
+          if (n === 1 || n % 100 === 0 || n === 1000) {
+            fetch("http://127.0.0.1:7491/ingest/1ac776a0-99df-4f99-9de6-75896fb8fe70", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a04187" },
+              body: JSON.stringify({
+                sessionId: "a04187",
+                runId: "ui-rtp",
+                hypothesisId: n === 1 ? "H2" : "H3",
+                location: "useSlotGame.ts:runTumbleSequence",
+                message: n === 1 ? "First spin RTP config" : `After ${n} spins`,
+                data: {
+                  totalSpins: newStats.totalSpins,
+                  totalBet: newStats.totalBet,
+                  totalWin: newStats.totalWin,
+                  realRtp: newStats.realRTP,
+                  targetRtp: getTargetRtp(),
+                  rtpMultiplier: getRtpMultiplier(),
+                },
+                timestamp: Date.now(),
+              }),
+            }).catch(() => {});
+          }
+          // #endregion
+
+          updateState((prev) => ({
+            ...prev,
+            phase: "idle",
+            // Ensure the UI shows the true post-tumble final state (important in turbo mode)
+            grid: spinResult.finalGrid,
+            multipliers: spinResult.finalMultipliers,
+            winPositions: [],
+            currentWinSymbol: null,
+            droppingPositions: [],
+            balance: shouldAddBalance ? prev.balance + totalWin : prev.balance,
+            spinWin: totalWin,
+            spinWinMultiplier: cumulativeWin,
+            stats: newStats,
+            message: totalWin > 0
+              ? `Win: ${totalWin.toFixed(2)} (${cumulativeWin.toFixed(2)}x)`
+              : "No win — try again!",
+            spinHistory: [record, ...prev.spinHistory].slice(0, 1000),
+          }));
+          scheduleNextAutoSpin(betAmount);
+        }
+      };
+
+      // Super fast auto spin: skip tumble steps entirely, directly settle using final result
+      if (isFastAuto && steps.length > 0) {
+        cumulativeWin = steps.reduce((sum, s) => sum + s.payout, 0);
+        stepIndex = steps.length;
+        finishSequence();
+        return;
+      }
+
+      const playNextStep = () => {
+        if (stepIndex >= steps.length) {
+          finishSequence();
           return;
         }
 
@@ -1120,6 +1191,7 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
           ...prev,
           autoSpinRemaining: 0,
           autoSpinTotal: 0,
+          autoSpinFastMode: false,
           message: autoSpinStopRef.current ? "Auto spin stopped" : "Auto spin complete!",
         }));
       }
@@ -1130,8 +1202,9 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
     const newRemaining = current.autoSpinRemaining - 1;
     updateState((prev) => ({ ...prev, autoSpinRemaining: newRemaining }));
 
-    const anim = stateRef.current.animationsEnabled;
-    timerRef.current = setTimeout(() => {
+    const isFastAuto = stateRef.current.autoSpinFastMode;
+    const anim = stateRef.current.animationsEnabled && !isFastAuto;
+    const performNext = () => {
       const s = stateRef.current;
       if (autoSpinStopRef.current) {
         updateState((prev) => ({ ...prev, autoSpinRemaining: 0, autoSpinTotal: 0, message: "Auto spin stopped" }));
@@ -1143,7 +1216,13 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
         return;
       }
       doSpin(false, false);
-    }, anim ? 300 : 0);
+    };
+
+    if (anim) {
+      timerRef.current = setTimeout(performNext, 300);
+    } else {
+      performNext();
+    }
   }, [updateState]);
 
   // ============================================================
@@ -1160,7 +1239,9 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
       const activeIsSugar = currentState.gameId === "sugar-rush-1000";
       const anteBet25x = currentState.anteBetMode === "x25";
       const effectiveBet = getEffectiveBet(currentState);
-      const anim = currentState.animationsEnabled;
+      const isFastAuto =
+        currentState.autoSpinFastMode && currentState.autoSpinRemaining > 0;
+      const anim = currentState.animationsEnabled && !isFastAuto;
 
       if (!isFreeSpins && currentState.balance < effectiveBet) {
         updateState((prev) => ({
@@ -1531,6 +1612,7 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
       ...prev,
       autoSpinRemaining: 0,
       autoSpinTotal: 0,
+      autoSpinFastMode: false,
       message: "Auto spin stopped",
     }));
     clearTimer();
@@ -1783,6 +1865,13 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
     }));
   }, [updateState]);
 
+  const setAutoSpinFastMode = useCallback((enabled: boolean) => {
+    updateState((prev) => ({
+      ...prev,
+      autoSpinFastMode: enabled,
+    }));
+  }, [updateState]);
+
   const getTargetRtpLocal = useCallback(() => {
     if (stateRef.current.gameId === "gates-of-olympus-1000") return Olympus.getTargetRtp();
     if (stateRef.current.gameId === "fortune-of-olympus") return Fortune.getTargetRtp();
@@ -1818,5 +1907,6 @@ export function useSlotGame(gameId: GameId = "sweet-bonanza-1000") {
     setVolatilityLevel,
     getVolatility: getVolatilityLocal,
     clearHistory,
+    setAutoSpinFastMode,
   };
 }
